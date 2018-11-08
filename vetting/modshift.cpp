@@ -934,7 +934,7 @@ void PLOT()
   outfile << "unset arrow" << endl;
   outfile << "unset xlabel" << endl;
   outfile << "unset label" << endl;
-  outfile << "set xtics ''" << endl;
+  //outfile << "set xtics ''" << endl;
   outfile << "set x2tics 0.25 mirror" << endl;
   outfile << "set format x2 '%4.2f'" << endl;
   outfile << "set ylabel 'Flux (ppm)'" << endl;

@@ -118,7 +118,7 @@ def computeSgCdpp_ppm(y, transitDuration_cadences=13, plot=False):
     polyorder=2
     noiseNorm = 1.40
     #Name change for consistency with original algorithm
-    cadencesPerTransit = transitDuration_cadences
+    cadencesPerTransit = int(transitDuration_cadences)
 
     if cadencesPerTransit < 4:
         raise ValueError("Cadences per transit must be >= 4")

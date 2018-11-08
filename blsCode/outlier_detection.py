@@ -15,8 +15,9 @@ Should this belong to a general "lightcurve maniuplation module"?
 
 
 
+
 def medianDetrend(flux, binWidth):
-    halfNumPoints = binWidth // 2
+    halfNumPoints = int(binWidth // 2)
     medians = np.array([])
     for i in range(len(flux)):
         if i < halfNumPoints:
