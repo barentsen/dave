@@ -100,12 +100,13 @@ def plot_multipages(outfile,clip,intext,figtype="png"):
     except AttributeError:
         pass
 
+    
     try:    
         #Plot centroid plots
         (fig2,fig1)=dip.plotWrapper(clip)
-    except:
-        fig1=plt.plot()
-        fig2=plt.plot()
+    except ValueError:
+        fig1=plt.figure()
+        fig2=plt.figure()
 
     fig1.set_size_inches(figuresize)
     pdf_pages.savefig(fig1, dpi=dotperinch)

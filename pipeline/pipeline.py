@@ -21,7 +21,7 @@ import dave.fileio.kplrfits as kplrfits
 
 try:
     import dave.lpp.calcLPPoctave as lpp
-except ImportError:
+except (ImportError, OSError):
     print "Warn: LPP can't be imported"
 
 import dave.fileio.mastio as mastio
@@ -218,7 +218,7 @@ def serveLocalTask(clip):
 def extractLightcurveTask(clip):
     time = clip['serve.time']
     data = clip['serve.socData']
-    numInitialCadencesToIgnore = clip['config.numInitialCadencesToIgnore']
+    numInitialCadencesToIgnore = int(clip['config.numInitialCadencesToIgnore'])
     flagValues = clip.get('serve.flags', data[:, 'SAP_QUALITY'])
     flux = data[:, 'SAP_FLUX'].copy()
 
@@ -598,7 +598,7 @@ def modshiftTask(clip):
 #    model = ioBlock.modellc -1   #Want mean of zero
 #    #model *= -1  #Invert for testing
     model = clip['trapFit.bestFitModel']
-    modplotint=1  # Change to 0 or anything besides 1 to not have modshift produce plot
+    modplotint=int(1)  # Change to 0 or anything besides 1 to not have modshift produce plot
     plotname = "%s-%02i-%04i-%s" % (basename,np.round(clip.bls.period*10),np.round(clip.bls.epoch),clip.config.detrendType)
     out = ModShift.runModShift(time[~fl], flux[~fl], model[~fl], \
         plotname, objectname, period_days, epoch_bkjd, modplotint)

@@ -130,7 +130,7 @@ def lowPass(y, normalisedCutoffFreq, filterHalfWidth, apodise=blackman):
 
     assert(filterHalfWidth %2 == 0)
     fc = normalisedCutoffFreq
-    num = filterHalfWidth
+    num = int(filterHalfWidth)
 
 
     filt = apodise(num) * sincFilter(fc, num)

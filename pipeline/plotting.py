@@ -51,7 +51,7 @@ def plotData(clip, nPanel=3):
     rawRange = np.percentile(raw[~fl], [1,99])
 
     for i in range(nPanel):
-        ax = plt.subplot(2*nPanel, 1, 2*i+1, axisbg=colour[i])
+        ax = plt.subplot(2*nPanel, 1, 2*i+1, facecolor=colour[i])
         plt.plot(time[~fl], raw[~fl], 'ko', ms=2, alpha=.8)
         plt.ylim(rawRange)
         plt.ylabel("Raw flux/1000")
@@ -59,7 +59,7 @@ def plotData(clip, nPanel=3):
         if markTransits:
             plotTransitRegions(time[~fl], per, epc, dur_days)
 
-        plt.subplot(2*nPanel, 1, 2*i+2, sharex=ax, axisbg=colour[i])
+        plt.subplot(2*nPanel, 1, 2*i+2, sharex=ax, facecolor=colour[i])
         #Plotting bad data cadences turned off
 #        plt.plot(time[fl], 0*time[fl], 'mo', ms=8, mec="none")
         plt.plot(time[~fl], flux[~fl], 'ko', ms=2, alpha=.8)

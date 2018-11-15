@@ -99,6 +99,7 @@ def estimateSnr(time, flux, flags, period_days, epoch_bkjd, \
         msg += "Period %.1f Duration %.2f hrs" %(period_days, duration_hrs)
         raise ValueError(msg)
 
+    #import pdb; pdb.set_trace()
     idx |= flags > 0  #Remove data flagged as bad
     idx |= ~np.isfinite(time)  #Or otherwise NaN
     idx |= ~np.isfinite(flux)  #Or otherwise NaN

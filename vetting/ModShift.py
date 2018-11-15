@@ -91,8 +91,14 @@ def runModShift(time,flux,model,plotname,objectname,period,epoch,modplotint):
     #Insert rant here asking why subprocess doesn't have a timeout when it's
     #the complicated module that was supposed to handle communication better.
     path = getModShiftDir()
-    cmd = ["timeout", "%i" %(timeout_sec),  "%s/modshift" %(path), \
+#    cmd = ["timeout", "%i" %(timeout_sec),  "%s/modshift" %(path), \
+#       tmpFilename, plotname, objectname, str(period), str(epoch), str(modplotint)]
+    cmd = ["%s/modshift" %(path), \
        tmpFilename, plotname, objectname, str(period), str(epoch), str(modplotint)]
+
+    print "command" 
+    
+    print cmd
 
     try:
         modshiftcmdout = check_output(cmd)
