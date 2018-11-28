@@ -33,7 +33,7 @@ class TessDvtLocalArchive(MastArchive):
         self.fileSuffix[1] = "00106_dvt.fits"
         self.fileSuffix[2] = "00109_dvt.fits"
         
-    def getDvt(self, sector, tic, *args, **kwargs):
+    def getDvt(self, tic, sector, *args, **kwargs):
         
         prefix= self.filePrefix[sector]
         suffix = self.fileSuffix[sector]
