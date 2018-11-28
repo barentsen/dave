@@ -9,7 +9,7 @@ import urllib
 import math
 import os
 
-import pyfits
+import dave.fileio.pyfits as pyfits
 
 
 class MastArchive():
@@ -25,10 +25,10 @@ class MastArchive():
         if not os.path.exists(localDir):
             try:
                 os.mkdir(localDir)
-            except IOError, e:
+            except IOError as e:
                 msg = "Local path %s does not exist and can't be created: %s" \
                     %(localDir, e)
-                raise IOError(e)
+                raise IOError(msg)
 
 
     def getData(self, localUrl, remoteUrl, compressedOnServer, *args, **kwargs):
@@ -77,12 +77,12 @@ class MastArchive():
 
         try:
             (f,h) = urllib.urlretrieve(remoteUrl, localUrl)
-        except IOError, e:
+        except IOError as e:
             raise(e)
 
 
         if verbose:
-            print h
+            print (h)
     
     def parse(self, localUrl, *args, **kwargs):
         """Load data using favourite IO class
@@ -94,12 +94,12 @@ class MastArchive():
         if 'ext' in kwargs and kwargs['ext'] == 0:
             try:
                 retVal = pyfits.getheader(localUrl, *args, **kwargs)
-            except IOError, e:
+            except IOError as  e:
                 raise e
         else:
             try:
                 retVal = pyfits.getdata(localUrl, *args, **kwargs)
-            except IOError, e:
+            except IOError as  e:
                 raise e
 
         return retVal
@@ -132,7 +132,7 @@ class KeplerAbstractClass(MastArchive):
         if not os.path.exists(localDir):
             try:
                 os.mkdir(localDir)
-            except OSError, e:
+            except OSError as  e:
                 #Re-raising an exception makes the error easier to read
                 raise e
 
@@ -141,7 +141,7 @@ class KeplerAbstractClass(MastArchive):
         if not os.path.exists(localDir):
             try:
                 os.makedirs(localDir)
-            except OSError. e:
+            except OSError as  e:
                 #Re-raising an exception makes the error easier to read
                 raise e
 
