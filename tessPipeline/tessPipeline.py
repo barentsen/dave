@@ -29,7 +29,7 @@ def lppMetricTask(clip):
                     
             
     data=clipToLppInputClass(clip)
-    mapInfo=clip['config.lppMapFilePath']
+    mapInfo=clip['config.lppMapFile']
     normTLpp,rawTLpp,transformedTransit=computeLPPTransitMetric(data,mapInfo)
 
     out = dict()
