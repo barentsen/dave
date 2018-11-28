@@ -40,7 +40,7 @@ def createConfig(sector, tic, planetNum, debugMode=True):
 
     cfg['modshiftBasename'] = "/home/fergal/data/tess/daveOutput/"    
     
-    cfg['taskList'] = ['serveTask', 'lppMetricTask', 'modShiftTask']
+    cfg['taskList'] = ['serveTask', 'lppMetricTask', 'modshiftTask']
     
     clip = clipboard.Clipboard(cfg)
     return clip
