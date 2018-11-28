@@ -101,7 +101,7 @@ def serveTask(clip):
 
 
 
-
+from dave.lpp.newlpp.loadLppData import MapInfo
 @task
 def lppMetricTask(clip):
     
@@ -116,11 +116,12 @@ def lppMetricTask(clip):
             self.dur=clip['serve.param.transitDuration_hrs']
             self.period=clip['serve.param.orbitalPeriod_days']
             self.flux=clip['serve.detrendFlux']
-                    
+            self.mes = 10.        
             
     data=clipToLppInputClass(clip)
-    mapInfo=clip['config.lppMapFile']
-    normTLpp,rawTLpp,transformedTransit=computeLPPTransitMetric(data,mapInfo)
+    mapInfoFile = clip['config.lppMapFile']
+    mapInfoObj = MapInfo(mapInfoFile)
+    normTLpp,rawTLpp,transformedTransit=computeLPPTransitMetric(data,mapInfoObj)
 
     out = dict()
     out['TLpp'] = normTLpp
@@ -152,7 +153,9 @@ def modshiftTask(clip):
 
     model = clip['serve.modelFlux']
     modplotint=int(1)  # Change to 0 or anything besides 1 to not have modshift produce plot
-    plotname = "%s-%02i-%04i-%s" % (basename,np.round(clip.bls.period*10),np.round(clip.bls.epoch),clip.config.detrendType)
+    plotname = "%s-%02i-%04i" % (basename, np.round(period_days*10), 
+                                    np.round(epoch_btjd))
+
     out = ModShift.runModShift(time, flux, model, \
         plotname, objectname, period_days, epoch_btjd, modplotint)
     clip['modshift'] = out
