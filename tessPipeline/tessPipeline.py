@@ -10,6 +10,8 @@ Created on Tue Nov 27 21:23:14 2018
 
 from __future__ import division
 
+from pdb import set_trace as debug
+
 from dave.lpp.newlpp.lppTransform import computeLPPTransitMetric
 import dave.tessPipeline.tessfunc as tessfunc
 import dave.pipeline.clipboard as clipboard
@@ -140,9 +142,16 @@ def modshiftTask(clip):
     
     time = clip['serve.time']
     flux = clip['serve.detrendFlux']
+    model = clip['serve.modelFlux']
     period_days = clip['serve.param.orbitalPeriod_days']
     epoch_btjd = clip['serve.param.epoch_btjd']
 
+    #Filter out nans
+    idx = np.isnan(time) | np.isnan(flux) | np.isnan(model)
+    time = time[~idx]
+    flux = flux[~idx]
+    model = model[~idx]
+    
     tic = clip['config.tic']
     basePath = clip['config.modshiftBasename']
     ticStr = "%016i" %(tic)
@@ -151,8 +160,7 @@ def modshiftTask(clip):
     # Name that will go in title of modshift plot
     objectname = "TIC %012i" % (tic)
 
-    model = clip['serve.modelFlux']
-    modplotint=int(1)  # Change to 0 or anything besides 1 to not have modshift produce plot
+    modplotint = 0  # Change to 0 or anything besides 1 to not have modshift produce plot
     plotname = "%s-%02i-%04i" % (basename, np.round(period_days*10), 
                                     np.round(epoch_btjd))
 
