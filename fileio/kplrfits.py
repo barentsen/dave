@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+    # -*- coding: utf-8 -*-
 
 
 #Note: binData is imported later in the file.
@@ -604,7 +604,7 @@ def markTransitCadences(time, period_days, epoch_bkjd, duration_days,\
     for tt in transitTimes:
         diff = time - tt
         diff[flags] = 1e99  #A large value that isn't Nan
-        assert(np.all(np.isfinite(diff)), "Nan found in diff")
+        assert np.all(np.isfinite(diff)), "Nan found in diff"
 
         idx = np.bitwise_or(idx, np.fabs(diff) < \
             .5*duration_days*numberOfDurations)
