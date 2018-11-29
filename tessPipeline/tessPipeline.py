@@ -174,3 +174,28 @@ def modshiftTask(clip):
     clip['modshift.mod_secdepth']
     clip['modshift.mod_sig_pri']
     return clip
+
+
+from dave.tessPipeline.sweet import runSweetTest
+@task 
+def sweetTask(clip):
+    time = clip['serve.time']
+    flux = clip['serve.detrendFlux']
+    period_days = clip['serve.param.orbitalPeriod_days']
+    epoch_btjd = clip['serve.param.epoch_btjd']
+    duration_hrs = clip['serve.param.transitDuration_hrs']     
+
+    idx = np.isnan(time) | np.isnan(flux) 
+    time = time[~idx]
+    flux = flux[~idx]
+    
+    duration_days = duration_hrs / 24.
+    result = runSweetTest(time, flux, period_days, epoch_btjd, duration_days)
+    
+    clip['sweet'] = result
+    
+    #Enforce contract
+    clip['sweet.msg']
+    clip['sweet.amp']
+    
+    return clip
