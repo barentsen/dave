@@ -6,6 +6,7 @@ import os
 __version__ = "$Id: prf.py 1964 2015-02-27 18:33:11Z fmullall $"
 __URL__ = "$URL: svn+ssh://flux/home/fmullall/svn/kepler/py/prf.py $"
 
+npmap = lambda f, x: np.array(map(f, x))
 
 class AbstractBasePrfLookup(object):
     """Store and lookup a previously computed PRF function
@@ -29,10 +30,7 @@ class AbstractBasePrfLookup(object):
         self.path = path
         self.cache = dict()
 
-        #Jow many sub-pixel positions are stored in the lookup files.
-        #For Kepler this is 50, but we define it as a class variable in case
-        #TESS is different
-        self.gridSize = 50.
+        self.gridSize = None
 
 
     def abstractGetPrfForBbox(self, col, row, bboxIn, getPrfFunc, *args):
@@ -226,18 +224,7 @@ class KeplerPrf(AbstractBasePrfLookup):
 
     def __init__(self, path):
         AbstractBasePrfLookup.__init__(self, path)
-
-#    def getPrfForImage(self, img, hdr, mod, out, col, row):
-#        """Figure out bbox then call getPrfForBbox"""
-#        raise NotImplementedError("")
-#        #DO I need to worry about 1 based/ zero based here?
-#        c0 = float(hdr['1CRV4P'])
-#        r0 = float(hdr['2CRV4P'])
-#
-#        img = self.getPrf(mod, out, img.shape, [c0, r0], \
-#            centroidOffsetColRow)
-#        return img
-
+        self.gridSize = 50
 
     def getPrfForBbox(self, mod, out, col, row, bboxIn):
         """Get PRF for a bounding box.
@@ -299,70 +286,131 @@ class KeplerPrf(AbstractBasePrfLookup):
         return img
 
 
+from pdb import set_trace as debug
 
+import scipy.io as spio
+class TessPrf(AbstractBasePrfLookup):
+    def __init__(self, path):
+        AbstractBasePrfLookup.__init__(self, path)
+        self.gridSize = 9
 
+    
+    def getPrfAtColRow(self, col, row, ccd, camera, sector):
+        
+        #Currently, the same PRF model applies to all sectors, so
+        #we pin the sector number. If the PRF is recalculated at a later
+        #date we'll need some logic here.
+        sector = 1
+        key = "%1i-%1i-%02i" %(ccd, camera, sector)
+        
+        if key not in self.cache:
+            self.cache[key] = self.readPrfFile(ccd, camera, sector)
+            
+        prfObj = self.cache[key]
+        regPrfArray, evalCols, evalRows = self.getRegularlySampledPrfs(prfObj, col,row)
+        bestRegPrf = self.interpolateRegularlySampledPrf(regPrfArray, \
+            col, row, evalCols, evalRows)
 
+        return bestRegPrf
 
-# The original version of this function, kept around in case it's needed
-#    def getPrfForBbox(self, mod, out, col, row, bboxIn):
-#        """Get the prf for an image described by a bounding box
-#
-#        Input:
-#        -----------
-#        mod, out
-#            (ints) Which channel is a tgt on
-#        col, row
-#            (floats) Centroid for which to generate prf
-#        bboxIn
-#            (int array). Size of image to return. bbox
-#            is a 4 elt array of [col0, col1, row0, row1]
-#
-#        Returns:
-#        ----------
-#        A 2d numpy array of the computed prf at the
-#        given position.
-#
-#        Notes:
-#        ------------
-#        If bbox is larger than the prf postage stamp returned,
-#        the missing values will be filled with zeros. If
-#        the bbox is smaller than the postage stamp, only the
-#        requestd pixels will be returned
-#        """
-#
-#        bbox = np.array(bboxIn).astype(int)
-#        nColOut = bbox[1] - bbox[0]
-#        nRowOut = bbox[3] - bbox[2]
-#        imgOut = np.zeros( (nRowOut, nColOut) )
-#
-#        #Location of origin of bbox relative to col,row.
-#        #This is usually zero, but need not be.
-#        colOffsetOut = (bbox[0] - np.floor(col)).astype(np.int)
-#        rowOffsetOut = (bbox[2] - np.floor(row)).astype(np.int)
-#
-#        interpPrf = self.getPrfAtColRow(mod, out, col, row)
-#        nRowPrf, nColPrf = interpPrf.shape
-#        colOffsetPrf = -np.floor(nColPrf/2.).astype(np.int)
-#        rowOffsetPrf = -np.floor(nRowPrf/2.).astype(np.int)
-#
-#        di = colOffsetPrf - colOffsetOut
-#        i0 = max(0, -di)
-#        i1 = min(nColOut-di , nColPrf)
-#        if i1 <= i0:
-#            raise ValueError("Central pixel column not in bounding box")
-#        i = np.arange(i0, i1)
-#        assert(np.min(i) >= 0)
-#
-#        dj = rowOffsetPrf - rowOffsetOut
-#        j0 = max(0, -dj)
-#        j1 = min(nRowOut-dj, nRowPrf)
-#        if j1 <= j0:
-#            raise ValueError("Central pixel row not in bounding box")
-#        j = np.arange(j0, j1)
-#        assert(np.min(j) >= 0)
-#
-#        #@TODO: figure out how to do this in one step
-#        for r in j:
-#            imgOut[r+dj, i+di] = interpPrf[r, i]
-#
-#        return imgOut
+    def getRegularlySampledPrfs(self, prfObj, col, row):
+        #Get columns and rows at which PRF was evaluated at
+        evalCol = npmap(lambda x: x.ccdColumn, prfObj)
+        evalRow = npmap(lambda x: x.ccdRow, prfObj)
+
+        dist2 = (col - evalCol)**2 + (row - evalRow)**2
+        srt = np.argsort(dist2)[:4]
+        
+        c0 = evalCol[srt]
+        r0 = evalRow[srt]
+
+        regArr = []        
+        loc = np.zeros((4), dtype=int)
+        for i in range(4):
+            loc[i] = np.where((evalCol == c0[i]) & (evalRow == r0[i]))[0]
+            
+            singlePrfObj = prfObj[loc[i]]
+            tmp = self.getSingleRegularlySampledPrf(singlePrfObj, col, row)
+            regArr.append(tmp)
+        
+        return np.array(regArr), c0, r0
+        
+    
+    def getSingleRegularlySampledPrf(self, singlePrfObj, col, row):
+        """
+        
+        Todo
+        --------
+        This function returns the PRF at the closest point of evaluation. It 
+        really should interpolate between points to get a PRF that varies
+        more smoothly with intrapixel location.
+        """
+        #Get the sub-pixel positions at which the PRF is evaluated
+        #The sub pixel positions repeat every 9 terms, so we only take the first repitition
+        #np.remainder strips out the integer portion.
+        #[:gridSize] trims to just the first repitition of the sequence
+        gridSize = self.gridSize
+        evalCol = np.remainder(singlePrfObj.prfColumn[:gridSize], 1)
+        evalRow = np.remainder(singlePrfObj.prfRow[:gridSize], 1)
+
+        #col, rowFrac represent the intraPixel location of the centroid.
+        #For example, if (col, row) = (123,4, 987.6), (colFrac, rowFrac) = (.4, .6)
+        #PRF evaluated from -.5 to +.5 in the pixel, so I think these half integer
+        #offsets are necessary
+        colFrac = np.remainder(col, 1) - .5
+        rowFrac = np.remainder(row, 1) - .5
+        
+        colOffset = np.argmin( evalCol - colFrac)
+        rowOffset = np.argmin( evalRow - rowFrac)
+
+        #TODO Reference documentation about samplesPerPixel        
+        fullImage = singlePrfObj.values/ float(singlePrfObj.samplesPerPixel)
+        
+        #Number of pixels in regularly sampled PRF. Typically 13x13
+        nColOut, nRowOut = fullImage.shape
+        nColOut /= float(gridSize)
+        nRowOut /= float(gridSize)
+
+        iCol = colOffset + (np.arange(nColOut)*gridSize).astype(np.int)
+        iRow = rowOffset + (np.arange(nRowOut)*gridSize).astype(np.int)
+
+        #Don't understand why this must be a twoliner
+        tmp = fullImage[iRow, :]
+        return tmp[:,iCol]
+    
+    
+    def interpolateRegularlySampledPrf(self, regPrfArray, col, row, evalCols, evalRows):
+        
+        debug()
+        #Sort inputs so evalCol and evalRows are both monotonically increasing
+        #np.interplated needs this to be true
+        srt = np.argsort(evalCols, kind='mergesort')   #mergesort is stabl
+        regPrfArray = regPrfArray[srt]
+        evalCols = evalCols[srt]
+        evalRows = evalRows[srt]
+
+        srt = np.argsort(evalRows, kind='mergesort')   #mergesort is stabl
+        regPrfArray = regPrfArray[srt]
+        evalCols = evalCols[srt]
+        evalRows = evalRows[srt]
+        
+        assert np.all(np.diff(evalCols) >= 0)
+        assert np.all(np.diff(evalRows) >= 0)
+        
+        print(evalCols)
+        print(evalRows)
+        debug()
+    
+
+            
+    def readPrfFile(self, ccd, camera, sector):
+        
+        if camera != 1:
+            raise ValueError("Only camera 1 currently available")
+            
+        fn = "tess2018243163600-00072_035-%i-%i-characterized-prf.mat" %(ccd, camera)
+        path = os.path.join(self.path, fn)
+
+        obj = spio.matlab.loadmat(path, struct_as_record=False, squeeze_me=True)
+        prfObj = obj['prfStruct']
+        return prfObj
