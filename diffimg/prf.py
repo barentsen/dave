@@ -111,6 +111,65 @@ class AbstractBasePrfLookup(object):
         return imgOut
 
 
+
+
+
+
+class KeplerPrf(AbstractBasePrfLookup):
+    """Return the expected PRF for a point source in the Kepler field
+    based on mod out, and centroid.
+
+    Note:
+    --------
+    For speed, this function caches some data for each module to
+    save reading it from file for each call. If you request the PRF
+    from many mod-outs you may find your memory increases dramatically.
+
+    """
+
+    def __init__(self, path):
+        AbstractBasePrfLookup.__init__(self, path)
+        self.gridSize = 50
+
+    def getPrfForBbox(self, mod, out, col, row, bboxIn):
+        """Get PRF for a bounding box.
+
+        See documentation in the same method in the parent class
+        """
+        args = [mod, out]
+
+        return self.abstractGetPrfForBbox(col, row, bboxIn, self.getPrfAtColRow, *args)
+
+
+    def getPrfAtColRow(self, col, row, mod, out):
+        """Compute the model prf for a given module, output, column row
+
+        This is the workhorse function of the class. For a given mod/out,
+        loads the subsampled PRFs at each corner of the mod-out, extracts
+        the appropriate image for the given subpixel position, then interpolates
+        those 4 images to the requested column and row.
+
+        Note:
+        --------
+        For speed, this function caches some data for each module to
+        save reading it from file for each call. If you request the PRF
+        from many mod-outs you may find your memory increases dramatically.
+
+        """
+
+        #Load subsampled PRFs from cache, or from file if not previously read in
+        key = "%02i-%02i" %(mod, out)
+        if key not in self.cache:
+            self.cache[key] = self.getSubSampledPrfs(mod, out)
+
+        fullPrfArray = self.cache[key]
+        regPrfArray = self.getRegularlySampledPrfs(fullPrfArray, col,row)
+        bestRegPrf = self.interpolateRegularlySampledPrf(regPrfArray, \
+            col, row)
+
+        return bestRegPrf
+
+
     def getRegularlySampledPrfs(self, fullPrfArray, col, row):
         regArr = []
         for i in range(5):
@@ -208,63 +267,6 @@ class AbstractBasePrfLookup(object):
         return tmp[:,c1]
 
 
-
-
-class KeplerPrf(AbstractBasePrfLookup):
-    """Return the expected PRF for a point source in the Kepler field
-    based on mod out, and centroid.
-
-    Note:
-    --------
-    For speed, this function caches some data for each module to
-    save reading it from file for each call. If you request the PRF
-    from many mod-outs you may find your memory increases dramatically.
-
-    """
-
-    def __init__(self, path):
-        AbstractBasePrfLookup.__init__(self, path)
-        self.gridSize = 50
-
-    def getPrfForBbox(self, mod, out, col, row, bboxIn):
-        """Get PRF for a bounding box.
-
-        See documentation in the same method in the parent class
-        """
-        args = [mod, out]
-
-        return self.abstractGetPrfForBbox(col, row, bboxIn, self.getPrfAtColRow, *args)
-
-
-    def getPrfAtColRow(self, col, row, mod, out):
-        """Compute the model prf for a given module, output, column row
-
-        This is the workhorse function of the class. For a given mod/out,
-        loads the subsampled PRFs at each corner of the mod-out, extracts
-        the appropriate image for the given subpixel position, then interpolates
-        those 4 images to the requested column and row.
-
-        Note:
-        --------
-        For speed, this function caches some data for each module to
-        save reading it from file for each call. If you request the PRF
-        from many mod-outs you may find your memory increases dramatically.
-
-        """
-
-        #Load subsampled PRFs from cache, or from file if not previously read in
-        key = "%02i-%02i" %(mod, out)
-        if key not in self.cache:
-            self.cache[key] = self.getSubSampledPrfs(mod, out)
-
-        fullPrfArray = self.cache[key]
-        regPrfArray = self.getRegularlySampledPrfs(fullPrfArray, col,row)
-        bestRegPrf = self.interpolateRegularlySampledPrf(regPrfArray, \
-            col, row)
-
-        return bestRegPrf
-
-
     def getSubSampledPrfs(self, mod, out):
         fullPrfArray = []
         for i in range(1,6):
@@ -290,9 +292,28 @@ from pdb import set_trace as debug
 
 import scipy.io as spio
 class TessPrf(AbstractBasePrfLookup):
+    
+    """Interpolate a TESS PRF image
+    
+    Caution: This code is under development and is expected to be buggy
+    
+    TODO: Interplolate, then pull out the regular sampled PRF
+    
+    Cache interplolation results for speed
+    """
+    
     def __init__(self, path):
         AbstractBasePrfLookup.__init__(self, path)
         self.gridSize = 9
+
+    def getPrfForBbox(self, sector, camera, ccd, col, row, bboxIn):
+        """Get PRF for a bounding box.
+
+        See documentation in the same method in the parent class
+        """
+        args = [ccd, camera, sector]
+
+        return self.abstractGetPrfForBbox(col, row, bboxIn, self.getPrfAtColRow, *args)
 
     
     def getPrfAtColRow(self, col, row, ccd, camera, sector):
@@ -308,7 +329,7 @@ class TessPrf(AbstractBasePrfLookup):
             
         prfObj = self.cache[key]
         regPrfArray, evalCols, evalRows = self.getRegularlySampledPrfs(prfObj, col,row)
-        bestRegPrf = self.interpolateRegularlySampledPrf(regPrfArray, \
+        bestRegPrf = self.interpolatePrf(regPrfArray, \
             col, row, evalCols, evalRows)
 
         return bestRegPrf
@@ -379,27 +400,33 @@ class TessPrf(AbstractBasePrfLookup):
         return tmp[:,iCol]
     
     
-    def interpolateRegularlySampledPrf(self, regPrfArray, col, row, evalCols, evalRows):
-        
-        debug()
+    def interpolatePrf(self, regPrfArray, col, row, evalCols, evalRows):
         #Sort inputs so evalCol and evalRows are both monotonically increasing
         #np.interplated needs this to be true
-        srt = np.argsort(evalCols, kind='mergesort')   #mergesort is stabl
+
+        #TODO Find a faster way to do this
+        index = np.array(map( lambda x, y: "%04i-%04i" %(x,y), evalCols, evalRows))   
+        
+        srt = np.argsort(index) 
         regPrfArray = regPrfArray[srt]
         evalCols = evalCols[srt]
         evalRows = evalRows[srt]
 
-        srt = np.argsort(evalRows, kind='mergesort')   #mergesort is stabl
-        regPrfArray = regPrfArray[srt]
-        evalCols = evalCols[srt]
-        evalRows = evalRows[srt]
+        p11, p12, p21, p22 = regPrfArray
+        c0, c1 = evalCols[1:3]
+        r0, r1 = evalRows[:2]
+
+        dCol = (col-c0) / (c1-c0)
+        dRow = (row-r0) / (r1 - r0)
         
-        assert np.all(np.diff(evalCols) >= 0)
-        assert np.all(np.diff(evalRows) >= 0)
+        #Intpolate across the rows
+        tmp1 = p11 + (p21 - p11) * dCol
+        tmp2 = p12 + (p22 - p12) * dCol
+
+        #Interpolate across the columns
+        out = tmp1 + (tmp2-tmp1) * dRow
+        return out
         
-        print(evalCols)
-        print(evalRows)
-        debug()
     
 
             
