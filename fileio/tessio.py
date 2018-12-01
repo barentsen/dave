@@ -14,12 +14,7 @@ import os
 class TessDvtLocalArchive(MastArchive):
     """
     Shim class to load DV Timeseries data from a local disk
-    
-    /Users/smullally/TESS/TCEs/Sector2/dvt/tess2018235142541-s0002-s0002-0000000100100827-00109_dvt.fits”
-
-    tess2018206190142-s0001-s0001-0000000471013508-00106_dvt.fits        
-
-    """    
+        """    
     def __init__(self, path):
         MastArchive.__init__(self, "/dev/null", 'www.example.com')
 
