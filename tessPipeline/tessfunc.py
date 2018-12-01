@@ -65,3 +65,5 @@ def getOutputBasename(basePath, tic):
         raise IOError("Can't write to output directory %s" %path)
 
     return os.path.join(path, ticStr)
+
+
