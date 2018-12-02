@@ -316,8 +316,16 @@ class TessPrf(AbstractBasePrfLookup):
         return self.abstractGetPrfForBbox(col, row, bboxIn, self.getPrfAtColRow, *args)
 
     
+    def checkOutOfBounds(self, col, row):
+        if col < 45 or col > 2091:
+            raise ValueError("Requested column (%i) not on phyiscal CCD [45,2091]" %(col))
+            
+        if row < 1 or row > 2047:
+            raise ValueError("Requested row (%i) not on phyiscal CCD [0,2047]" %(row))
+
     def getPrfAtColRow(self, col, row, ccd, camera, sector):
-        
+
+        self.checkOutOfBounds(col, row)        
         #Currently, the same PRF model applies to all sectors, so
         #we pin the sector number. If the PRF is recalculated at a later
         #date we'll need some logic here.
@@ -326,37 +334,61 @@ class TessPrf(AbstractBasePrfLookup):
         
         if key not in self.cache:
             self.cache[key] = self.readPrfFile(ccd, camera, sector)
-            
+
         prfObj = self.cache[key]
-        regPrfArray, evalCols, evalRows = self.getRegularlySampledPrfs(prfObj, col,row)
-        bestRegPrf = self.interpolatePrf(regPrfArray, \
+        prfArray, evalCols, evalRows = self.getRegularlySampledBracketingPrfs(prfObj, col,row)
+        bestPrf = self.interpolatePrf(prfArray, \
             col, row, evalCols, evalRows)
 
-        return bestRegPrf
+#        regPrf = self.getSingleRegularlySampledPrf(bestPrf, col, row)
+        return bestPrf
 
-    def getRegularlySampledPrfs(self, prfObj, col, row):
+    
+    def getRegularlySampledBracketingPrfs(self, prfObj, col, row):
         #Get columns and rows at which PRF was evaluated at
+        cr = np.array((col, row))
+
+        nEval = np.sqrt(len(prfObj))
+        assert nEval == int(nEval), "PRF grid is not square"
+        nEval = int(nEval)
+        
+        #Read cols and rows at which PRF is evaluated
         evalCol = npmap(lambda x: x.ccdColumn, prfObj)
         evalRow = npmap(lambda x: x.ccdRow, prfObj)
-
-        dist2 = (col - evalCol)**2 + (row - evalRow)**2
-        srt = np.argsort(dist2)[:4]
         
-        c0 = evalCol[srt]
-        r0 = evalRow[srt]
+        #Sort prfArray so its the right shape for getBracketingIndices()
+        evalColrow = np.vstack((evalCol, evalRow)).transpose()
+        srt = np.lexsort((evalRow, evalCol))
+        evalColRow = evalColrow[srt].reshape((nEval, nEval, 2))
+        prfArray = prfObj[srt].reshape((nEval, nEval))
+        
+        whBracket = getBracketingIndices(evalColRow, cr)        
+        
+        c0, r0 = [], []
+        regPrfArr = []
+        for itr in range(4):
+            i, j = whBracket[itr]
+            #Store column and row
+            c0.append( evalColRow[ i, j, 0 ] )
+            r0.append( evalColRow[ i, j, 1 ] )
 
-        regArr = []        
-        loc = np.zeros((4), dtype=int)
-        for i in range(4):
-            loc[i] = np.where((evalCol == c0[i]) & (evalRow == r0[i]))[0]
+            #Check I did all the book keeping correctly
+            assert c0[itr] == prfArray[i,j].ccdColumn    
+            assert r0[itr] == prfArray[i,j].ccdRow    
             
-            singlePrfObj = prfObj[loc[i]]
-            tmp = self.getSingleRegularlySampledPrf(singlePrfObj, col, row)
-            regArr.append(tmp)
-        
-        return np.array(regArr), c0, r0
-        
-    
+            #Pull out the 13x13 image for this location
+            regPrf = self.getSingleRegularlySampledPrf(prfArray[i,j], col, row)
+            regPrfArr.append(regPrf)
+
+        #More checks: check the order of the locations is correct
+        assert c0[0] == c0[2]
+        assert c0[1] == c0[3]
+        assert r0[0] == r0[1]
+        assert r0[2] == r0[3]
+        return np.array(regPrfArr), np.array(c0), np.array(r0)
+
+
+
     def getSingleRegularlySampledPrf(self, singlePrfObj, col, row):
         """
         
@@ -415,6 +447,9 @@ class TessPrf(AbstractBasePrfLookup):
         p11, p12, p21, p22 = regPrfArray
         c0, c1 = evalCols[1:3]
         r0, r1 = evalRows[:2]
+        
+        assert c0 != c1
+        assert r0 != r1
 
         dCol = (col-c0) / (c1-c0)
         dRow = (row-r0) / (r1 - r0)
@@ -441,3 +476,125 @@ class TessPrf(AbstractBasePrfLookup):
         obj = spio.matlab.loadmat(path, struct_as_record=False, squeeze_me=True)
         prfObj = obj['prfStruct']
         return prfObj
+
+
+
+def getBracketingIndices(evalColRow, cr):
+    """
+    Get the indices of `evalColRow` that bracket `cr`
+
+    This is a special function used by TessPrf
+    
+    This function encapsulates some fairly knotty bookkeeping. Unless something
+    is broken you probably want to leave this function well alone
+    
+    Inputs
+    --------
+    evalColRow
+        (3d np array) See discussion below
+    cr
+        (2 element np array) The column and row to be bracketed
+
+    Returns
+    ----------
+    A 4x2 numpy array. Each row represents the indices into
+    `evalColRow[,,:]` representing the 4 points in `evalColRow`
+    that bracket the location represented by evalColRow
+    
+    
+    Note
+    -----
+    The model prf is evaluated on a regular grid across the CCD. Each
+    grid point can be represented in two coordinate systems; the 
+    CCD pixel coordinates (this PRF is evaluated at col,row=24,36,
+    and a grid Index (this is the second grid location in column, and
+    the third in row). `evalColRow` encodes a mapping from one coord sys
+    to the other.
+    
+    The zeroth dimension of `evalColRow` encodes the column of the grid 
+    location (e.g. 2 in the example above). The first dimension
+    encodes row of the grid location (3 in the example), the second
+    dimension encodes whether the value represents CCD column 
+    (`evalColRow[:,:,0]`) or CCD row (`evalColRow[:,:,1]`). The
+    value at each array element represents the CCD position (either
+    column or row).
+    
+    The return value of this function is a list of the 4 grid locations
+    that bracket the input `cr` in column and row (below left, below right,
+    above left, above right)
+    
+    Example
+    ---------
+    `evalColRow` consists of 4 points at which the model prf is evalulated
+    
+    .. code-block:: python
+    
+        a[0,0,0] =  45
+        a[0,0,1] =   1   #Zeroth prf evalulated at (col, row) = (45,1)
+        a[0,1,0] =  45
+        a[0,1,1] = 128
+
+        a[1,0,0] = 183
+        a[1,0,1] =   1
+        a[1,1,0] = 183
+        a[1,1,1] = 128
+
+        cr = (45, 45)  #Somewhere in the middle
+    
+    The return value is
+    
+    .. code-block:: python
+    
+        [ [0,0], [1,0], [1,0], [1,1] ]
+        
+    Because these are the indices that bracket the input col,row
+    """
+    tmp = (evalColRow - cr)
+    dist = np.hypot(tmp[:,:,0], tmp[:,:,1])
+    wh = np.unravel_index( np.argmin(dist), dist.shape)
+
+    nearestEval = evalColRow[wh]
+    delta = cr - nearestEval 
+
+    #Find the 3 other evaluations of the PRF that bracket (col, row)
+    tmp = []
+    if delta[0] >= 0 and delta[1] >= 0:        #A
+        tmp.append( wh )
+        tmp.append( wh + np.array((+1, +0)) )
+        tmp.append( wh + np.array((+0, +1)) )
+        tmp.append( wh + np.array((+1, +1)) )
+        
+    elif delta[0] < 0 and delta[1] >= 0:       #S
+        tmp.append( wh + np.array((-1, +0)) )
+        tmp.append( wh )
+        tmp.append( wh + np.array((-1, +1)) )
+        tmp.append( wh + np.array((+0, +1)) )
+
+    elif delta[0] < 0 and delta[1] < 0:        #T
+        tmp.append( wh + np.array((-1, -1)) )
+        tmp.append( wh + np.array((-0, -1)) )
+        tmp.append( wh + np.array((-1, +0)) )
+        tmp.append( wh )
+
+    else:                                      #C
+        tmp.append( wh + np.array((-0, -1)) )
+        tmp.append( wh + np.array((+1, -1)) )
+        tmp.append( wh )
+        tmp.append( wh + np.array((+1, +0)) )
+    tmp = np.array(tmp)
+
+    #Check the order of values is correct
+    c0 = tmp[:,0]
+    r0 = tmp[:,1]
+    assert c0[0] == c0[2]
+    assert c0[1] == c0[3]
+    assert r0[0] == r0[1]
+    assert r0[2] == r0[3]
+    
+    #Bounds checking
+    assert np.min(tmp) >= 0
+    assert np.max(tmp[:,0]) < evalColRow.shape[0]
+    assert np.max(tmp[:,1]) < evalColRow.shape[1]
+
+    return tmp
+
