@@ -293,27 +293,23 @@ class TessPrf(AbstractPrfLookup):
         
         TODO: Make sure this is right.
         """
-        #Sort inputs so evalCol and evalRows are both monotonically increasing
-        #np.interplated needs this to be true
+        #OK, this is paranoia. These statements have already been asserted, but in a 
+        #different function
+        assert evalCols[0] == evalCols[2]
+        assert evalCols[1] == evalCols[3]
+        assert evalRows[0] == evalRows[1]
+        assert evalRows[2] == evalRows[3]
 
-        #TODO Find a faster way to do this
-        index = np.array(map( lambda x, y: "%04i-%04i" %(x,y), evalCols, evalRows))   
-        
-        srt = np.argsort(index) 
-        regPrfArray = regPrfArray[srt]
-        evalCols = evalCols[srt]
-        evalRows = evalRows[srt]
-
-        p11, p12, p21, p22 = regPrfArray
-        c0, c1 = evalCols[1:3]
-        r0, r1 = evalRows[:2]
+        p11, p21, p12, p22 = regPrfArray
+        c0, c1 = evalCols[:2]
+        r0, r1 = evalRows[1:3]
         
         assert c0 != c1
         assert r0 != r1
 
         dCol = (col-c0) / (c1-c0)
         dRow = (row-r0) / (r1 - r0)
-        
+
         #Intpolate across the rows
         tmp1 = p11 + (p21 - p11) * dCol
         tmp2 = p12 + (p22 - p12) * dCol
@@ -321,8 +317,6 @@ class TessPrf(AbstractPrfLookup):
         #Interpolate across the columns
         out = tmp1 + (tmp2-tmp1) * dRow
         return out
-        
-    
 
             
     def readPrfFile(self, ccd, camera, sector):
