@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-# Copyright 2017-2018 Orbital Insight Inc., all rights reserved.
-# Contains confidential and trade secret information.
-# Government Users: Commercial Computer Software - Use governed by
-# terms of Orbital Insight commercial license agreement.
-
 """
 Created on Fri Nov 30 23:11:29 2018
 
@@ -14,14 +9,14 @@ from __future__ import print_function
 from __future__ import division
 
 from pdb import set_trace as debug
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 #import matplotlib.patches as mpatch
 #import matplotlib as mpl
 #import pandas as pd
 import numpy as np
 import pytest
 
-import prf
+import tessprf as prf
 
 datapath = "/home/fergal/data/tess/prf/"
 
@@ -65,7 +60,106 @@ def test_outOfBounds():
     obj.getPrfAtColRow(45, 1, 1, 1, 1)
     obj.getPrfAtColRow(2091, 2047, 1, 1, 1)
         
+
+def testIntFloatBug():        
+    """getPrfAtColRow() should return same value whether input is int or float"""
+
+    obj = prf.TessPrf(datapath)
+    
+    img1 = obj.getPrfAtColRow(123, 456, 1,1,1)
+    img2 = obj.getPrfAtColRow(123.0, 456.0, 1,1,1)
+    
+    assert np.all(img1 - img2 == 0)
+    
+    
+def imgByOffset():
+    ccd, camera, sector = 1,1,1
+    col, row = 123, 456
+    
+    obj = prf.TessPrf(datapath)
+    prfObjArray = obj.readPrfFile(ccd, camera, sector)
+ 
+    singlePrfObj = prfObjArray[0]
+    img0 = obj.getRegularlySampledPrfByOffset(singlePrfObj, 0, 0)
+
+    for offset in range(9):
+#        img1 = obj.getRegularlySampledPrfByOffset(singlePrfObj, offset, 0)
+        img1 = obj.getRegularlySampledPrfByOffset(singlePrfObj, offset, 0)
+        delta = img1 - img0
+        
+        kwargs = {'origin':'bottom', 'interpolation':'nearest', 'cmap':plt.cm.YlGnBu_r}
+        plt.clf()
+        plt.subplot(121)
+        plt.imshow(img1, **kwargs)
+        plt.colorbar()
+        
+        plt.subplot(122)
+        kwargs['cmap'] = plt.cm.PiYG
+        plt.imshow(delta, **kwargs)  
+        vm = max( np.fabs( [np.min(delta), np.max(delta)] ))
+#        vm = 1e-2
+        plt.clim(-vm, vm)
+        plt.colorbar()
+        plt.suptitle(offset)
+        plt.pause(.1)
+        raw_input()
+            
     
 def testColFrac():        
     """Test that changing column fraction moves flux around"""
-    assert False
+
+    obj = prf.TessPrf(datapath)
+    
+    img1 = obj.getPrfAtColRow(123.0, 456, 1,1,1)
+    
+    for frac in np.linspace(0, .9, 11):
+        print("Frac is %g" %(frac))
+        img2 = obj.getPrfAtColRow(123.0 + frac, 456.0, 1,1,1)
+        delta = img2 - img1
+        
+#        prfPlot(img1, delta)
+        
+        #For TESS, PRFs are 13x13. Check the flux near the centre
+        #is moving from lower columns to higher ones
+        assert delta[6,6] >= 0, delta[6,6]
+        assert delta[6,7] >= 0, delta[6,7]
+        assert delta[6,5] <= 0, delta[6,5]
+        
+
+def testRowFrac():        
+    """Test that changing column fraction moves flux around"""
+
+    obj = prf.TessPrf(datapath)
+    
+    img1 = obj.getPrfAtColRow(123.0, 456, 1,1,1)
+    
+    for frac in np.linspace(0, .9, 11):
+        img2 = obj.getPrfAtColRow(123.0, 456.0 + frac, 1,1,1)
+        delta = img2 - img1
+        
+#        prfPlot(img1, delta)
+        
+        #For TESS, PRFs are 13x13. Check the flux near the centre
+        #is moving from lower columns to higher ones
+        assert delta[6,6] >= 0, delta[6,6]
+        assert delta[7,6] >= 0, delta[7,6]
+        assert delta[5,6] <= 0, delta[5,6]
+
+        
+def prfPlot(refImg, delta):
+        
+        kwargs = {'origin':'bottom', 'interpolation':'nearest', 'cmap':plt.cm.YlGnBu_r}
+        plt.clf()
+        plt.subplot(121)
+        plt.imshow(refImg, **kwargs)
+        plt.colorbar()
+        
+        plt.subplot(122)
+        kwargs['cmap'] = plt.cm.PiYG
+        plt.imshow(delta, **kwargs)  
+        vm = max( np.fabs( [np.min(delta), np.max(delta)] ))
+#        vm = 1e-2
+        plt.clim(-vm, vm)
+        plt.colorbar()
+        plt.pause(.1)
+    
