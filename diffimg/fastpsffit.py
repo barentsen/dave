@@ -51,13 +51,14 @@ def fastGaussianPrfFit(img, guess):
         (function) Model to fit. See module level documentation for more details.
     guess
         (tuple or array) Elements are 
-        * col0, row0
+        
+        col0, row0
             Location of PSF centroid
-        * sigma
+        sigma
             Width of gaussian
-        * flux
+        flux
             Height of gaussian. Beware this is not normalized
-        * sky
+        sky
             Background level
 
 
