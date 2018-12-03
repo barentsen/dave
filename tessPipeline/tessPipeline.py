@@ -199,3 +199,26 @@ def sweetTask(clip):
     clip['sweet.amp']
     
     return clip
+
+
+#Won't work until serve loads up a TPF file
+from dave.tessPipeline.pertransitcentroids import measurePerTransitCentroids
+@task
+def centroidsTask(clip):
+    
+    time = clip['serve.time']
+    cube = clip['serve.cube']
+    period_days = clip['serve.param.orbitalPeriod_days']
+    epoch_btjd = clip['serve.param.epoch_btjd']
+    duration_hrs = clip['serve.param.transitDuration_hrs']     
+    
+    duration_days = duration_hrs / 24.
+    res = measurePerTransitCentroids(time, cube, period_days, epoch_btjd, 
+                                     duration_days, plotFilePattern=None)
+
+    res['method'] = "Fast Gaussian PSF fitting"
+    clip['diffImgCentroids'] = res
+    
+    #Enforce contract
+    clip['diffImgCentroids.results']
+    return clip
