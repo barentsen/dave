@@ -10,21 +10,19 @@ from __future__ import division
 
 from pdb import set_trace as debug
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatch
-import matplotlib as mpl
-import pandas as pd
 import numpy as np
 
 import dave.diffimg.fastpsffit as ddf
-from kepler.plateau import plateau
-import kplrfits
-
+from dave.misc.plateau import plateau
+import dave.fileio.kplrfits as kplrfits
 
 def measurePerTransitCentroids(time, cube, period_days, epoch_days, duration_days, plotFilePattern=None):
     """Measure difference image centroids for each transit in a data set
     
     For each transit, compute the centroid of a image reprsenting the the position of the star before transit,
     after transit, and the difference image. 
+
+    Not working yet. Before and After centroids are in the wrong place
     
     Inputs
     --------
@@ -53,8 +51,8 @@ def measurePerTransitCentroids(time, cube, period_days, epoch_days, duration_day
     if plotFilePattern is None:
         plot = False
     
-    if plotFilePattern is not None:
-        raise NotImplementedError("Plots not implemented yet")
+#    if plotFilePattern is not None:
+#        raise NotImplementedError("Plots not implemented yet")
         
         
     isnan = np.isnan(time)
@@ -73,15 +71,15 @@ def measurePerTransitCentroids(time, cube, period_days, epoch_days, duration_day
             plt.suptitle('%s-trans%02i' %(plotFilePattern , i))   
             plt.savefig('%s-trans%02i.png' %(plotFilePattern , i))
 
-    results = np.array( (len(transits), 6) )
+    results = np.zeros( (len(transits), 6) )
     for i in range(len(transits)):
         key = 'transit-%04i' %(i)
-        results[:,2] = out[key]['beforeCentroid']
-        results[:,2:4] = out[key]['diffCentroid']
-        results[:,4:6] = out[key]['afterCentroid']
+        results[i,:2] = out[key]['beforeCentroid']
+        results[i,2:4] = out[key]['diffCentroid']
+        results[i,4:6] = out[key]['afterCentroid']
         
     out['results'] = results
-    
+    return out
     
 
 def getIngressEgressCadences(time, period_days, epoch_btjd, duration_days):
@@ -116,19 +114,18 @@ def measureCentroidShift(cube, cin, plot=True):
     
     before, after, diff = generateDiffImg(cube, cin, plot=plot)
 
-    print("Before...")
     guess = pickInitialGuess(before)
     beforeSoln = ddf.fastGaussianPrfFit(before, guess)
 
-    print("Diff...")
     guess = pickInitialGuess(diff)
     diffSoln = ddf.fastGaussianPrfFit(diff, guess)
 
-    print("After...")
     guess = pickInitialGuess(after)
     afterSoln = ddf.fastGaussianPrfFit(after, guess)
 
-
+    if plot:
+        generateDiffImgPlot(before, diff, after, beforeSoln, diffSoln, afterSoln)
+        
     out = dict()
     error = 0
     error += 1 * (not beforeSoln.success)
@@ -217,53 +214,81 @@ def pickInitialGuess(img):
 
 
 
-def generateDiffImgPlot(before, diff, after):
+def generateDiffImgPlot(before, diff, after, beforeSoln, diffSoln, afterSoln):
     """Generate a difference image plot"""
+    
+    kwargs = {'origin':'bottom', 'interpolation':'nearest', 'cmap':plt.cm.YlGnBu_r}
+    
     plt.clf()
     plt.subplot(221)
-    plt.imshow(before, origin='bottom')
+    plt.imshow(before, **kwargs)
     plt.title("Before")
     plt.colorbar()
 
     plt.subplot(222)
-    plt.imshow(after, origin='bottom')
+    plt.imshow(after, **kwargs)
     plt.title("After")
     plt.colorbar()
 
     plt.subplot(223)
-    plt.imshow(after - before, origin='bottom', cmap=plt.cm.RdYlBu_r)
+    kwargs['cmap'] = plt.cm.RdBu_r
+    img = after - before
+    plt.imshow(img, **kwargs)
     plt.title("After - Before")
+    vm = max( np.fabs([np.min(img), np.max(img)]) )
+    plt.clim(-vm, vm)
     plt.colorbar()
 
     plt.subplot(224)
-    plt.imshow(diff, origin='bottom', cmap=plt.cm.RdYlBu_r)
+    plt.imshow(diff, **kwargs)
+    vm = max( np.fabs([np.min(img), np.max(img)]) )
+    plt.clim(-vm, vm)
+    
+    plotCentroidLocation(beforeSoln, 's', ms=8, label="Before")
+    plotCentroidLocation(afterSoln, '^', ms=8, label="After")
+    plotCentroidLocation(diffSoln, 'o', ms=12, label="Diff")
+    
+#    plt.legend()
     plt.title("Diff")
     plt.colorbar()
+    plt.pause(1)
+
+def plotCentroidLocation(soln, *args, **kwargs):
+    """Add a point to the a plot.
+    
+    Private function of `generateDiffImgPlot()`
+    """
+    col, row = soln.x[:2]
+    ms = kwargs.pop('ms', 8)
+    
+
+    kwargs['color'] = 'w'
+    plt.plot([col], [row], *args, ms=ms+1, **kwargs)
+
+    color='orange'
+    if soln.success:
+        color='c'
+    kwargs['color'] = color
+    plt.plot([col], [row], *args, **kwargs)
 
 
-#def main(tic, sector, period_days, epoch_btjd, duration_days, outpattern):
-#
-#    path = '/home/fergal/data/tess/hlsp_tess-data-alerts_tess_phot_%011i-s%02i_tess_v1_tp.fits'
-#    path = path %(tic, sector)
-#    fits, hdr = pyfits.getdata(path, header=True)
-#    cube = ktpf.getTargetPixelArrayFromFits(fits, hdr)
-#    cube = cube[:, 3:9, 2:8]
-#
-#    time = fits['TIME']
-#    isnan = np.isnan(time)
-#    time = time[~isnan]
-#    cube = cube[~isnan]
-#
-#    transits = getIngressEgressCadences(time, period_days, epoch_btjd, duration_days)
-#    with open('%s.cent.txt' %(outpattern), 'w') as fp:
-#        for i in range(len(transits)):
-#            print("Transit %i" %(i))
-#            cin = transits[i]
-#            res = measureCentroidShift(cube, cin, True)
-#
-#            plt.suptitle('%s-trans%02i' %(outpattern, i))
-#            plt.savefig('%s-trans%02i.png' %(outpattern, i))
-#
-#            pattern = "%.6f " * len(res)
-#            pattern = pattern + "\n"
-#            fp.write( pattern % tuple(res))
+
+def testSmoke():
+    import dave.fileio.pyfits as pyfits
+    import dave.fileio.tpf as tpf
+    tic = 307210830
+    sector = 2
+
+    period_days = 3.69061
+    epoch_btjd = 1356.2038
+    duration_days = 1.2676/24.
+
+    path = '/home/fergal/data/tess/hlsp_tess-data-alerts_tess_phot_%011i-s%02i_tess_v1_tp.fits'
+    path = path %(tic, sector)
+    fits, hdr = pyfits.getdata(path, header=True)
+    
+    time = fits['TIME']
+    cube = tpf.getTargetPixelArrayFromFits(fits, hdr)
+    cube = cube[:, 3:9, 2:8]
+    
+    measurePerTransitCentroids(time, cube, period_days, epoch_btjd, duration_days, "tmp")
