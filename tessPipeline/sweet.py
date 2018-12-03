@@ -68,10 +68,10 @@ def SweetFitOotFlux(phase, flux):
     period = np.max(phase)
     fObj = lsf.Lsf(phase, flux, None, 2, lsf.sine, period=period)
     
-    plt.figure()
-    plt.clf()
-    plt.plot(phase, flux, 'k.')
-    plt.plot(phase, fObj.getBestFitModel(), 'r.')
+    #plt.figure()
+    #plt.clf()
+    #plt.plot(phase, flux, 'k.')
+    #plt.plot(phase, fObj.getBestFitModel(), 'r.')
 
     amp, phase, ampUnc, phaseUnc = lsf.computeAmplitudeAndPhaseWithUnc(fObj)
     return amp, ampUnc
