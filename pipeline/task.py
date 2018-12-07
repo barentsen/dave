@@ -1,13 +1,8 @@
 # -*- coding: utf-8 -*-
 
 
-from multiprocessing import pool
-import multiprocessing
-import contextlib
 
-import clipboard
 import traceback
-import parmap
 import signal
 import time
 import pdb
@@ -82,8 +77,8 @@ def task(func):
 
         clip = args[0]
         if 'exception' in clip.keys():
-            print "INFO: %s not run because exception previously raised" \
-                %(func.func_name)
+            print( "INFO: %s not run because exception previously raised" \
+                %(func.func_name))
             return clip
 
         if "__meta__" not in clip.keys():
@@ -103,13 +98,13 @@ def task(func):
         t0 = time.time()
         try:
             clip = func(*args, **kwargs)
-        except SyntaxError, e:
+        except SyntaxError as e:
             raise(e)
-        except Exception, e:
+        except Exception as e:
             if debug:
                 #Cancel timeout, if any
                 signal.alarm(0)
-                print e
+                print( e)
                 pdb.post_mortem(sys.exc_info()[2])
                 raise e
             else:
@@ -128,7 +123,7 @@ def task(func):
                 if debug:
                     raise throwable
                 else:
-                    print throwable
+                    print( throwable)
                     clip = {'exception': throwable}
                     clip['functionName'] = func.__name__
 
@@ -160,86 +155,3 @@ def handleTimeout(signum, frame):
 
     return result
 
-def runAll(func, iterable, config):
-    """Run func over every element on iterable in parallel.
-
-    Not yet run or tested.
-
-    Inputs:
-    ----------
-    func
-	(A function) The top level function, e.g runOne(), below
-
-    iterable
-	(list, array, etc.) A list of values to operate on.
-
-    config
-	(Clipboard) A configuration clipboard.
-    """
-
-    count = multiprocessing.cpu_count() - 1
-    p = pool.Pool(count)
-
-
-    parallel = config.get('debug', False)
-
-    with contextlib.closing(pool.Pool(count)) as p:
-        out = parmap.map(runOne, iterable, config, pool=p, parallel=parallel)
-
-    return out
-
-
-
-
-def runOne(value, config):
-    """A sample top level function to run a single instance of a pipeline
-
-    Not yet run or tested.
-
-    Inputs:
-    ----------
-    value
-	(undefined)  The input value that is unique to this run, eg the name of
-	the file to process, or the value to perform some computation on.
-
-    config
-	(Clipboard) A configuration clipboard. Must contain the key 'taskList'. See below
-
-
-    Returns:
-    -----------
-    A clipboard, containing the results of the processing.
-
-    Notes:
-    ----------
-    The config clipboard must contain the key taskList. taskList is
-    a list of strings, each listing the function name of a task to
-    run in the pipeline, in the order they should be run. The
-    first task should look of the unique value in clip['value']
-
-    The tasks as passed as strings because functions can't bepa
-    ssed to parallel processes.This means that your tasks must
-    be defined in scope of this file. The easiest way
-    to do this looks like
-
-    import task
-    import stuff
-
-    task.func1 = stuff.func1
-    task.func2 = stuff.func2
-
-    config['taskList'] = ["func1", "func2"]
-    """
-
-
-    taskList = config['taskList']
-
-    clip = clipboard.Clipboard()
-    clip['config'] = config
-    clip['value'] = value
-
-    for t in taskList:
-        f = eval(t)
-        clip = f(clip)
-
-    return clip

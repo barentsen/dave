@@ -96,9 +96,7 @@ def runModShift(time,flux,model,plotname,objectname,period,epoch,modplotint):
     cmd = ["%s/modshift" %(path), \
        tmpFilename, plotname, objectname, str(period), str(epoch), str(modplotint)]
 
-    print "command" 
-    
-    print cmd
+    print " ".join(cmd)
 
     try:
         modshiftcmdout = check_output(cmd)
