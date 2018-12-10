@@ -43,7 +43,7 @@ def createConfig(sector, tic, planetNum, debugMode=True):
 
     cfg['modshiftBasename'] = "/Users/smullally/TESS/TCEs/Sector1/dave"    
     
-    cfg['taskList'] = ['serveTask', 'lppMetricTask', 'modshiftTask','sweetTask']
+    cfg['taskList'] = ['serveTask', 'lppMetricTask','sweetTask']
     
     clip = clipboard.Clipboard(cfg)
     
@@ -65,9 +65,10 @@ def outputInfo(clip):
     text = "%s,%f" % (text, clip.lpp.TLpp)
     header = "%s,Tlpp" % (header) 
     
-    for k in clip.modshift.keys():    
-        text = "%s,%f" % (text, clip['modshift'][k])
-        header = "%s,%s" % (header, k)
+    if "modshiftTask" in clip.config.taskList:
+        for k in clip.modshift.keys():    
+            text = "%s,%f" % (text, clip['modshift'][k])
+            header = "%s,%s" % (header, k)
     
     for k in clip.robovet.keys():
         text = "%s, %s" % (text, str(clip['robovet'][k]))
@@ -84,8 +85,14 @@ def runOneDv(sector,tic,planetNum,debugMode=True):
     
     # This is an attempt at quickly vetting the signals.
     # This should be its own task.
-    
-    rv = RoboVet.roboVet(clip.modshift)
+    try:
+        rv = RoboVet.roboVet(clip.modshift)
+    except:
+        rv={}
+        rv['disp'] = 'candidate'
+        rv['comments'] = 'NO_MODSHIFT'
+        rv['not_trans_like'] = 0
+        rv['sig_sec'] = 0
     
     lpp_th = 4  #Threshold for LPP
     
@@ -115,8 +122,8 @@ def runAllTces(tceFile,sector,outfile):
     """
     df=p.read_csv(tceFile,comment='#')
     
-    for index,row in df[0:5].iterrows():
-        
+    for index,row in df[847:1000].iterrows():
+        print row.ticid
         clip=runOneDv(sector,row.ticid,row.planetNumber)
         text,header = outputInfo(clip)
         
