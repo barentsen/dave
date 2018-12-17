@@ -15,12 +15,13 @@ import numpy as np
 
 class TCE(object):
     
-    def __init__(self):
+    def __init__(self, catid, planetNum):
         """
         Init creates default values that define the TCE.
         The minimum set are (id, times (days), fluxes (fractional), period (days), tzero)
         """
-        self.id = 0
+        self.id = catid
+        self.planetNum = planetNum
         self.time = np.array([0])
         self.phase = np.array([0])
         self.flux = np.array([0])
@@ -37,14 +38,14 @@ class TCE(object):
         This uses the median detrended light curve.t
         """
         
-        self.times = data['TIME']
-        self.phases = data['PHASE']
-        self.fluxes = data['LC_DETREND']
+        self.time = data['time']
+        self.phase = data['phase']
+        self.flux = data['lc_detrend']
         self.period = header['TPERIOD']
         self.tzero = header['TEPOCH']
         self.dur = header['TDUR']
         self.depth = header['TDEPTH']
-        self.mes = header['MAXMES']
+        self.mes = header['maxmes']
         
         self.checkTce()
         
@@ -53,10 +54,10 @@ class TCE(object):
         Check basic properties of the TCE values to ensure valid.
         """
         
-        if len(self.times) != len(self.phases):
+        if len(self.time) != len(self.phase):
             raise Warning("Length of Time and Phase do not agree.")
             
-        if len(self.times) != len(self.fluxes):
+        if len(self.time) != len(self.flux):
             raise Warning("Length of Times and Fluxes do not agree.")
         
         if self.period <= 0 :
