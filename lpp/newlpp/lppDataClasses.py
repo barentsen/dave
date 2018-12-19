@@ -30,7 +30,7 @@ class TCE(object):
         self.tzero = 0
         self.dur = -1  #duration in hours
         self.depth = 0  #transit depth in ppm.
-        self.snr = 0
+        self.mes = 10
         
     def populateFromDvExt(self, data, header):
         """
