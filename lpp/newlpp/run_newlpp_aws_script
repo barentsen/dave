@@ -1,0 +1,97 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Aug 27 12:34:01 2018
+
+@author: smullally
+"""
+from __future__ import print_function
+from __future__ import division
+import numpy as np
+from dave.lpp.newlpp.lppDataClasses import TCE
+from dave.lpp.newlpp.lppDataClasses import MapInfo
+from dave.tessPipeline.tessmastio import TessAstroqueryArchive
+import dave.lpp.newlpp.lppTransform as lppt
+from datetime import date
+import pandas as p
+
+#%%
+#The following is the code for one.
+
+ticid=114985772
+sector=1
+planetNumber = 1
+mapfilename='/Users/smullally/Code/lpptransitlikemetric/data/maps/combMapDR25AugustMapDV_6574.mat'
+
+mapInfo=MapInfo(mapfilename)
+
+archive=TessAstroqueryArchive(cachePath = "/Users/smullally/TESS/TCEs/mast/.")
+dvData,dvHeader = archive.getDvt(ticid, sector, ext=planetNumber, header=True)
+
+tce=TCE(ticid, planetNumber)
+tce.populateFromDvExt(dvData, dvHeader)
+tce.sector = sector
+
+normTLpp, rawTLpp, transformedTr=lppt.computeLPPTransitMetric(tce,mapInfo)
+
+tce.normTLpp=normTLpp
+tce.rawTLpp = rawTLpp
+tce.transformedLppTr = transformedTr
+tceDict=tce.__dict__
+
+#%%
+# But I want to loop over the TCEs in the csv files. 
+
+def write_line(tceDict, columns, output):
+    
+    for c in columns:
+        output.write("%s " % str(tceDict[c]))
+    output.write("\n")
+
+
+def write_header(columns, output):
+    """
+    Write a header for the file.
+    Last line is the name of the columns we want to write.
+    """
+    output.write("# TCE Table with Normalized LPP Transit Metric.\n")
+    output.write("# Date: %s\n" % str( date.today() ))
+
+    for c in columns:
+        output.write("%s  " % c)
+    output.write("\n")
+
+#%%
+#Iterate over many
+tceCsv="/Users/smullally/TESS/TCEs/tess2018206190142-s0001-s0001_dvr-tcestats.csv"
+sector=1
+outputFileName="/Users/smullally/TESS/TCEs/tce_lpp_sector1.txt"
+cachePath="/Users/smullally/TESS/TCEs/mast/."
+columns = ['id','planetNum','sector','period','tzero','depth','dur','mes','normTLpp','rawTLpp']
+
+mapfilename='/Users/smullally/Code/lpptransitlikemetric/data/maps/combMapDR25AugustMapDV_6574.mat'
+mapInfo=MapInfo(mapfilename)
+
+tcelist = p.read_csv(tceCsv,comment='#')
+
+output=open(outputFileName,'w')
+write_header(columns,output)
+
+for i,row in tcelist[0:3].iterrows():
+    
+    archive=TessAstroqueryArchive(cachePath = cachePath)
+    dvData,dvHeader = archive.getDvt(row.ticid, sector, ext=row.planetNumber, header=True) 
+    tce=TCE(row.ticid, row.planetNumber)
+    tce.populateFromDvExt(dvData, dvHeader)
+    tce.sector = sector
+    
+    normTLpp, rawTLpp, transformedTr=lppt.computeLPPTransitMetric(tce,mapInfo)
+    tce.normTLpp=normTLpp
+    tce.rawTLpp = rawTLpp
+    tce.transformedLppTr = transformedTr
+    tceDict=tce.__dict__
+    
+    write_line(tceDict, columns, output)
+
+output.close()
+

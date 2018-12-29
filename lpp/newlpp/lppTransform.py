@@ -26,6 +26,7 @@ data.lpp_transform
 @author: smullally
 """
 from __future__ import division
+from __future__ import print_function
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 from lpproj import LocalityPreservingProjection
@@ -51,8 +52,6 @@ def computeLPPTransitMetric(data,mapInfo):
     normTLpp=periodNormalLPPTransitMetric(rawTLpp,np.array([data.period,data.mes]), mapInfo)
     
     return normTLpp,rawTLpp,transformedTransit
-    
-    
     
 
 def runningMedian(t,y,dt,runt):
@@ -124,8 +123,6 @@ def foldBinLightCurve (data, ntrfr, npts):
     b_num=41
     b =np.linspace((0.5-ntrfr*transit_fr),(0.5+ntrfr*transit_fr),b_num)
 
-    #print "length a: %u " % len(a)
-    #print "length b: %u" % len(b)
     [runta,runya] = runningMedian(phaselc,flux,binover/npts,a)
     [runtb,runyb] = runningMedian(phaselc,flux,\
                     (binover*ovsamp*ntrfr*transit_fr)/npts,b)

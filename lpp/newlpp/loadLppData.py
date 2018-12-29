@@ -18,6 +18,8 @@ import scipy.io as spio
 from astropy.io import fits
 import requests
 import numpy as np
+from __future__ import print_function
+from __future__ import division
 
 class TCE(object):
     
@@ -32,15 +34,22 @@ class TCE(object):
             self.filename = "%stess2019128220341-%016u-00011_dvt.fits" % (ddir,int(starid))
         self.ext=ext
 
-        print self.filename    
+        print(self.filename)   
         
+    def getRemoteDvtFileName(self):
+        """
+        Get the DVT file using Astroquery
+        """
+        
+        
+    
         
     def readDV(self):
 
         try:
             hdu=fits.open(self.filename)
         except IOError:
-            print "Filename not found: %s" % self.filename
+            print("Filename not found: %s" % self.filename)
             raise
             
         ext=self.ext
@@ -63,7 +72,7 @@ class TCE(object):
         url = "https://mast.stsci.edu"
         loc = '/api/v0.1/dvdata/%u/table/?tce=%u' % (self.starid,self.ext)
         getRequest= url + loc
-        print getRequest
+        print(getRequest)
         r=requests.get(url=getRequest)
         tce=r.json()
         
@@ -73,7 +82,7 @@ class TCE(object):
         
         loc='/api/v0.1/dvdata/%u/info/?tce=%u' % (self.starid,self.ext)
         getRequest=url + loc
-        print getRequest
+        print(getRequest)
         r=requests.get(url=getRequest)
         tce=r.json()
         self.period=tce['DV Data Header']['TPERIOD']
