@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
-import tessprf as prf
+import dave.diffimg.tessprf as prf
 
 datapath = "/home/fergal/data/tess/prf/"
 
