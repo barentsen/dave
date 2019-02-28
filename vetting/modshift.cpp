@@ -812,6 +812,7 @@ void PLOT()
   outfile.open(tmpstr1.c_str());
   outfile << "set term pdfcairo enhanced dashed size 8.5in,11in font ',16'" << endl; //pdfcairo enhanced size 5.5in,4.25in" << endl;
   outfile << "set output '" << basename << "-modshift.pdf'" << endl;
+  outfile << "set colorsequence classic" << endl;
   outfile << "set multiplot layout 4,1 title \"" << objectname << ", P = " << setprecision(6) << period << " Days, E = " << setprecision(6) << epoch << " Days\" font ',20'" << endl;
 
   // Make the table containing the results
