@@ -12,6 +12,7 @@ from pdb import set_trace as debug
 import scipy.io as spio
 import numpy as np
 import os
+from astropy.io import fits
 
 npmap = lambda f, x: np.array(list(map(f, x)))
 
@@ -215,16 +216,16 @@ class TessPrf(AbstractPrfLookup):
         more smoothly with intrapixel location.
         """
 
-        colOffset, rowOffset = self.getOffsetsFromPixelFractions(singlePrfObj, col, row)
+        colOffset, rowOffset = self.getOffsetsFromPixelFractions(col, row)
         img = self.getRegularlySampledPrfByOffset(singlePrfObj, colOffset, rowOffset)
         return img
 
 
-    def getOffsetsFromPixelFractions(self, singlePrfObj, col, row):
+    def getOffsetsFromPixelFractions(self, col, row):
         """Private function of `getSingleRegularlySampledPrf()`
 
         Map the fractional part of the col,row position to an offset into the
-        full prf image. For example, if (col, row) = (123,4, 987.6), then
+        full prf image. For example, if (col, row) = (123.4, 987.6), then
         (colFrac, rowFrac) = (.4, .6).
 
         This function was developed through trial and error, rather than by
@@ -330,6 +331,161 @@ class TessPrf(AbstractPrfLookup):
         prfObj = obj['prfStruct']
         return prfObj
 
+    def readOnePrfFitsFile(self, ccd, camera, col, row, \
+                           version=2018243163600):
+        fn = "cam%u_ccd%u/tess%13u-prf-%1u-%1u-row%04u-col%04u.fits" % \
+            (camera, ccd, version, camera, ccd, col, row)
+        
+        filepath = os.path.join(self.path, fn)
+        
+        hdulistObj = fits.open(filepath)
+        
+        prfArray = hdulistObj[0].data
+        
+        return prfArray
+
+    def determineClosestTessRowCol(self,col,row):
+        """Determine the two rows and two columns to the row, col position
+        of your target. These are specific to TESS and where they chose to report 
+        their PRFs.
+        Returns Row list and Col list.
+        """
+        
+        posRows = np.array([1, 513, 1025, 1536, 2048])
+        posCols = np.array([45, 557, 1069, 1580,2092])
+        
+        difcol = np.abs(posCols - col)
+        difrow = np.abs(posRows - row)
+        
+        #Expand out to the four image position to interpolate between,
+        #Return as a list of tuples.
+        imagePos = []
+        for c in posCols[np.argsort(difcol)[0:2]]:
+            for r in posRows[np.argsort(difrow)[0:2]]:
+                imagePos.append((c,r))
+            
+        return imagePos
+    
+    def getRegSampledPrfFitsByOffset(self, prfArray, colOffset, rowOffset):
+        """Private function of `getSingleRegularlySampledPrf()`
+
+        The 13x13 pixel PRFs on at each grid location are sampled at a 9x9 intra-pixel grid, to
+        describe how the PRF changes as the star moves by a fraction of a pixel in row or column.
+        To extract out a single PRF, you need to address the 117x117 array in a slightly funny way
+        (117 = 13x9),
+
+        .. code-block:: python
+
+            img = array[ [colOffset, colOffset+9, colOffset+18, ...],
+                         [rowOffset, rowOffset+9, ...] ]
+
+        """
+        #TODO Reference documentation about samplesPerPixel
+
+        gridSize = self.gridSize
+
+        #TODO: Bounds checks like this don't belong in an inner loop. Remove them
+        #once you're sure they never get triggered.
+        if colOffset >= gridSize:
+            raise ValueError("Requested column offset (%i) too large" %(colOffset))
+        if rowOffset >= gridSize:
+            raise ValueError("Requested row offset (%i) too large" %(colOffset))
+
+
+        assert colOffset < gridSize
+        assert rowOffset < gridSize
+
+
+        #Number of pixels in regularly sampled PRF. Typically 13x13
+        nColOut, nRowOut = prfArray.shape
+        nColOut /= float(gridSize)
+        nRowOut /= float(gridSize)
+
+        iCol = colOffset + (np.arange(nColOut) * gridSize).astype(np.int)
+        iRow = rowOffset + (np.arange(nRowOut) * gridSize).astype(np.int)
+
+        #Don't understand why this must be a twoliner
+        tmp = prfArray[iRow, :]
+        
+        return tmp[:,iCol]
+    
+    def getRegularlySampledBracketingPrfFits(self, ccd,camera,col,row):
+        """
+        Get the regularly sampled PRF image.
+        
+        Returns
+        ------------
+        regPrfArr
+            An array of 4 regularly sampled PRFs (regularly sampled PRFs are 13x13 images that can be
+            directly compared to a real image (unlike the PRF objects stored on disk, which need to be
+            unpacked before use)
+        
+        evalCols
+            array of columns of the 4 images.
+        evalRows
+            array of rows of the 4 images.
+            
+        """
+        version=self.version
+             
+        colOffset,rowOffset = self.getOffsetsFromPixelFractions(col, row)
+        
+        imagePos = self.determineClosestTessRowCol(self,col,row)
+        prfImages = []
+        evalCols = []
+        evalRows = []
+        
+        for pos in imagePos:
+            prfArray = self.readOnePrfFitsFile(ccd, camera, pos[0], pos[1], \
+                           version=version)
+            
+            img = self.getRegSampledPrfFitsByOffset(prfArray, colOffset, rowOffset)
+            
+            prfImages.append(img)
+            
+            evalCols.append(pos[0])
+            evalRows.append(pos[1])
+        
+        return prfImages, np.array(evalCols),np.array(evalRows)
+        
+        
+        
+    
+    def getPrfAtColRowFits(self, col, row, ccd, camera, sector):
+        """
+        Lookup a 13x13 PRF image for a single location
+
+        Inputs
+        ---------
+        col, row
+            (floats) Location on CCD to lookup. The origin of the CCD is the bottom left.
+            Increasing column increases the "x-direction", and row increases the "y-direction"
+        ccd
+            (int) CCD number. There are 4 CCDs per camera
+        camera
+            (int) Camera number. The instrument has 4 cameras
+
+        Returns
+        ---------
+        A 13x13 numpy image array.
+        """
+        col = float(col)
+        row = float(row)
+
+        self.checkOutOfBounds(col, row)
+        #Currently, the same PRF model applies to all sectors, so
+        #we pin the sector number. When the PRF is recalculated at a later
+        #date we'll need some logic here.
+        #Here is where we could set the directory information based on sector.
+        sector = self.sectorLookup(sector)
+
+        prfArray, evalCols, evalRows = self.getRegularlySampledBracketingPrfsFits(ccd,camera,col,row)
+        bestPrf = self.interpolatePrf(prfArray, col, row, evalCols, evalRows)
+
+#        regPrf = self.getSingleRegularlySampledPrf(bestPrf, col, row)
+        return bestPrf
+
+        
 
 
 def getBracketingIndices(evalColRow, cr):
