@@ -7,7 +7,7 @@ Created on Sun Dec  2 14:12:33 2018
 from __future__ import print_function
 from __future__ import division
 
-from AbstractPrfLookup import AbstractPrfLookup
+from dave.diffimg.AbstractPrfLookup import AbstractPrfLookup
 from pdb import set_trace as debug
 import scipy.io as spio
 import numpy as np
@@ -48,6 +48,7 @@ class TessPrf(AbstractPrfLookup):
     def __init__(self, path):
         AbstractPrfLookup.__init__(self, path)
         self.gridSize = 9
+        self.version = "2018243163600"
 
 
     def getPrfForBbox(self, col, row, ccd, camera, sector, bboxIn):
@@ -95,6 +96,7 @@ class TessPrf(AbstractPrfLookup):
 
         prfObj = self.cache[key]
         prfArray, evalCols, evalRows = self.getRegularlySampledBracketingPrfs(prfObj, col,row)
+
         bestPrf = self.interpolatePrf(prfArray, \
             col, row, evalCols, evalRows)
 
@@ -217,6 +219,7 @@ class TessPrf(AbstractPrfLookup):
         """
 
         colOffset, rowOffset = self.getOffsetsFromPixelFractions(col, row)
+
         img = self.getRegularlySampledPrfByOffset(singlePrfObj, colOffset, rowOffset)
         return img
 
@@ -238,6 +241,9 @@ class TessPrf(AbstractPrfLookup):
 
         colOffset = gridSize - np.round(gridSize * colFrac) - 1
         rowOffset = gridSize - np.round(gridSize * rowFrac) - 1
+        
+        #print(colOffset)
+        #print(rowOffset)
 
         return int(colOffset), int(rowOffset)
 
@@ -270,9 +276,11 @@ class TessPrf(AbstractPrfLookup):
 
         assert colOffset < gridSize
         assert rowOffset < gridSize
-
-        fullImage = singlePrfObj.values/ float(singlePrfObj.samplesPerPixel)
-
+        #Why does fergal divide by the smaples per pixel
+        #fullImage = singlePrfObj.values/ float(singlePrfObj.samplesPerPixel)
+        fullImage = singlePrfObj.values
+        #print(fullImage[0,0])
+        
         #Number of pixels in regularly sampled PRF. Typically 13x13
         nColOut, nRowOut = fullImage.shape
         nColOut /= float(gridSize)
@@ -295,10 +303,18 @@ class TessPrf(AbstractPrfLookup):
         """
         #OK, this is paranoia. These statements have already been asserted, but in a
         #different function
+ 
         assert evalCols[0] == evalCols[2]
         assert evalCols[1] == evalCols[3]
         assert evalRows[0] == evalRows[1]
         assert evalRows[2] == evalRows[3]
+
+#        print(evalCols)
+#        print(evalRows)
+#        print(regPrfArray[0][1,1])
+#        print(regPrfArray[1][1,1])
+#        print(regPrfArray[2][1,1])
+#        print(regPrfArray[3][1,1])
 
         p11, p21, p12, p22 = regPrfArray
         c0, c1 = evalCols[:2]
@@ -321,10 +337,11 @@ class TessPrf(AbstractPrfLookup):
 
     def readPrfFile(self, ccd, camera, sector):
 
-        if camera != 1:
-            raise ValueError("Only camera 1 currently available")
+        #if camera != 1:
+        #    raise ValueError("Only camera 1 currently available")
 
-        fn = "tess2018243163600-00072_035-%i-%i-characterized-prf.mat" %(ccd, camera)
+        fn = "tess%13s-00072_035-%i-%i-characterized-prf.mat" % \
+                                        (self.version, camera, ccd)
         path = os.path.join(self.path, fn)
 
         obj = spio.matlab.loadmat(path, struct_as_record=False, squeeze_me=True)
@@ -333,10 +350,11 @@ class TessPrf(AbstractPrfLookup):
 
     def readOnePrfFitsFile(self, ccd, camera, col, row, \
                            version=2018243163600):
-        fn = "cam%u_ccd%u/tess%13u-prf-%1u-%1u-row%04u-col%04u.fits" % \
-            (camera, ccd, version, camera, ccd, col, row)
+        fn = "cam%u_ccd%u/tess%13s-prf-%1u-%1u-row%04u-col%04u.fits" % \
+            (camera, ccd, version, camera, ccd, row, col)
         
         filepath = os.path.join(self.path, fn)
+        print(filepath)
         
         hdulistObj = fits.open(filepath)
         
@@ -360,8 +378,8 @@ class TessPrf(AbstractPrfLookup):
         #Expand out to the four image position to interpolate between,
         #Return as a list of tuples.
         imagePos = []
-        for c in posCols[np.argsort(difcol)[0:2]]:
-            for r in posRows[np.argsort(difrow)[0:2]]:
+        for r in posRows[np.argsort(difrow)[0:2]]:
+            for c in posCols[np.argsort(difcol)[0:2]]:
                 imagePos.append((c,r))
             
         return imagePos
@@ -430,7 +448,7 @@ class TessPrf(AbstractPrfLookup):
              
         colOffset,rowOffset = self.getOffsetsFromPixelFractions(col, row)
         
-        imagePos = self.determineClosestTessRowCol(self,col,row)
+        imagePos = self.determineClosestTessRowCol(col,row)
         prfImages = []
         evalCols = []
         evalRows = []
@@ -479,7 +497,8 @@ class TessPrf(AbstractPrfLookup):
         #Here is where we could set the directory information based on sector.
         sector = self.sectorLookup(sector)
 
-        prfArray, evalCols, evalRows = self.getRegularlySampledBracketingPrfsFits(ccd,camera,col,row)
+        prfArray, evalCols, evalRows = self.getRegularlySampledBracketingPrfFits(ccd,camera,col,row)
+
         bestPrf = self.interpolatePrf(prfArray, col, row, evalCols, evalRows)
 
 #        regPrf = self.getSingleRegularlySampledPrf(bestPrf, col, row)

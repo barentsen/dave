@@ -162,4 +162,17 @@ def prfPlot(refImg, delta):
         plt.clim(-vm, vm)
         plt.colorbar()
         plt.pause(.1)
+   
+def testCompareTwoPrf():
+    ddir="/Users/smullally/TESS/prfs/"
+    aprf=prf.TessPrf(path=ddir)
+    prfImageMat = aprf.getPrfAtColRow(46.1,4.1, 2, 1, 1)
+    prfImage = aprf.getPrfAtColRowFits(46.1,4.1, 2, 1, 1)
     
+    assert np.all(np.abs(prfImageMat - prfImage) < 5e-16)
+    print("The Next Test")
+    prfImageMat = aprf.getPrfAtColRow(1147.76,414.1, 1, 2, 1)
+    prfImage = aprf.getPrfAtColRowFits(1147.76,414.1, 1, 2, 1)
+    #Introplation step can cause small differences at the edgie
+    #If the order of the four images change.
+    assert np.all(np.abs(prfImageMat - prfImage) < 5e-16)
