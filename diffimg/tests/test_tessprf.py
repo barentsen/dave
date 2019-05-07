@@ -18,7 +18,7 @@ import pytest
 
 import dave.diffimg.tessprf as prf
 
-datapath = "/home/fergal/data/tess/prf/"
+datapath = "/Users/smullally/TESS/prfs/"
 
 def test_bracketing():
     """The method getRegularlySampledBracketingPrfs() has some fairly complicated
@@ -166,13 +166,15 @@ def prfPlot(refImg, delta):
 def testCompareTwoPrf():
     ddir="/Users/smullally/TESS/prfs/"
     aprf=prf.TessPrf(path=ddir)
-    prfImageMat = aprf.getPrfAtColRow(46.1,4.1, 2, 1, 1)
-    prfImage = aprf.getPrfAtColRowFits(46.1,4.1, 2, 1, 1)
-    
+    prfImageMat = aprf.getPrfAtColRow(46.5, 4.11, 2, 1, 1)
+    prfImage = aprf.getPrfAtColRowFits(46.5, 4.11, 2, 1, 1)
+    #print(prfImageMat-prfImage)
+  
     assert np.all(np.abs(prfImageMat - prfImage) < 5e-16)
+    
     print("The Next Test")
-    prfImageMat = aprf.getPrfAtColRow(1147.76,414.1, 1, 2, 1)
-    prfImage = aprf.getPrfAtColRowFits(1147.76,414.1, 1, 2, 1)
+    prfImageMat = aprf.getPrfAtColRow(1147.76,414.1, 1, 2, 2)
+    prfImage = aprf.getPrfAtColRowFits(1147.76,414.1, 1, 2, 2)
     #Introplation step can cause small differences at the edgie
     #If the order of the four images change.
     assert np.all(np.abs(prfImageMat - prfImage) < 5e-16)

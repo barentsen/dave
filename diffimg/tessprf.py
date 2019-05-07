@@ -48,7 +48,7 @@ class TessPrf(AbstractPrfLookup):
     def __init__(self, path):
         AbstractPrfLookup.__init__(self, path)
         self.gridSize = 9
-        self.version = "2018243163600"
+        self.ddir = path
 
 
     def getPrfForBbox(self, col, row, ccd, camera, sector, bboxIn):
@@ -88,8 +88,10 @@ class TessPrf(AbstractPrfLookup):
         #Currently, the same PRF model applies to all sectors, so
         #we pin the sector number. If the PRF is recalculated at a later
         #date we'll need some logic here.
-        sector = self.sectorLookup(sector)
-        key = "%1i-%1i-%02i" %(ccd, camera, sector)
+        #sector = self.sectorLookup(sector)
+        sector = self.pathLookup(ccd,camera,sector)
+        
+        key = "MAT%1i-%1i-%02i" %(ccd, camera, sector)
 
         if key not in self.cache:
             self.cache[key] = self.readPrfFile(ccd, camera, sector)
@@ -122,6 +124,7 @@ class TessPrf(AbstractPrfLookup):
         And remember to update the docstring when you do.
 
         """
+
         return 1
 
 
@@ -339,26 +342,35 @@ class TessPrf(AbstractPrfLookup):
 
         #if camera != 1:
         #    raise ValueError("Only camera 1 currently available")
+        
 
         fn = "tess%13s-00072_035-%i-%i-characterized-prf.mat" % \
-                                        (self.version, camera, ccd)
+                                        (self.datestring, camera, ccd)
         path = os.path.join(self.path, fn)
+        #print(path)
 
         obj = spio.matlab.loadmat(path, struct_as_record=False, squeeze_me=True)
         prfObj = obj['prfStruct']
         return prfObj
 
-    def readOnePrfFitsFile(self, ccd, camera, col, row, \
-                           version=2018243163600):
+    def readOnePrfFitsFile(self, ccd, camera, col, row, sector):
+        
         fn = "cam%u_ccd%u/tess%13s-prf-%1u-%1u-row%04u-col%04u.fits" % \
-            (camera, ccd, version, camera, ccd, row, col)
+            (camera, ccd, self.datestring, camera, ccd, row, col)
         
         filepath = os.path.join(self.path, fn)
-        print(filepath)
+        #print(filepath)
         
-        hdulistObj = fits.open(filepath)
-        
-        prfArray = hdulistObj[0].data
+        #Cache the read infiles in case you use more than once.
+        key = "FITS%1i-%1i-%02i-%04i-%04i" %(ccd, camera, sector,row,col)
+
+        if key not in self.cache:
+            hdulistObj = fits.open(filepath)
+            prfArray = hdulistObj[0].data
+            
+            self.cache[key] = prfArray
+
+        prfArray = self.cache[key]
         
         return prfArray
 
@@ -427,7 +439,7 @@ class TessPrf(AbstractPrfLookup):
         
         return tmp[:,iCol]
     
-    def getRegularlySampledBracketingPrfFits(self, ccd,camera,col,row):
+    def getRegularlySampledBracketingPrfFits(self, ccd,camera,col,row,sector):
         """
         Get the regularly sampled PRF image.
         
@@ -444,7 +456,6 @@ class TessPrf(AbstractPrfLookup):
             array of rows of the 4 images.
             
         """
-        version=self.version
              
         colOffset,rowOffset = self.getOffsetsFromPixelFractions(col, row)
         
@@ -455,7 +466,7 @@ class TessPrf(AbstractPrfLookup):
         
         for pos in imagePos:
             prfArray = self.readOnePrfFitsFile(ccd, camera, pos[0], pos[1], \
-                           version=version)
+                           sector)
             
             img = self.getRegSampledPrfFitsByOffset(prfArray, colOffset, rowOffset)
             
@@ -467,7 +478,32 @@ class TessPrf(AbstractPrfLookup):
         return prfImages, np.array(evalCols),np.array(evalRows)
         
         
+    def pathLookup(self,ccd,camera,sector):
+        """
+        Get the file name version information
+        based on the ccd, camer and sector of your data.
+        """
         
+        if sector < 1:
+           raise ValueError("Sector must be greater than 0.")
+        if (camera > 4) | (ccd > 4):
+            raise ValueError("Camera or CCD is larger than 4.")
+        
+        if sector <= 3:
+            self.path = self.ddir + "/start_s0001/"
+            sector=1
+        else:
+            self.path = self.ddir + "/start_s0004/"
+            sector=4
+        
+        self.datestring = "2018243163600"
+        
+        if camera >= 3:
+            self.datestring = "2018243163601"
+        elif (camera == 2) & (ccd == 4):
+            self.datestring = "2018243163601"
+        
+        return sector
     
     def getPrfAtColRowFits(self, col, row, ccd, camera, sector):
         """
@@ -491,13 +527,12 @@ class TessPrf(AbstractPrfLookup):
         row = float(row)
 
         self.checkOutOfBounds(col, row)
-        #Currently, the same PRF model applies to all sectors, so
-        #we pin the sector number. When the PRF is recalculated at a later
-        #date we'll need some logic here.
-        #Here is where we could set the directory information based on sector.
-        sector = self.sectorLookup(sector)
+        #Currently, the same PRF model applies to all sectors, 
+        #But we will need this in the future.
+        #Returned sector is the start sector of the prfs.
+        sector = self.pathLookup(ccd,camera,sector)
 
-        prfArray, evalCols, evalRows = self.getRegularlySampledBracketingPrfFits(ccd,camera,col,row)
+        prfArray, evalCols, evalRows = self.getRegularlySampledBracketingPrfFits(ccd,camera,col,row,sector)
 
         bestPrf = self.interpolatePrf(prfArray, col, row, evalCols, evalRows)
 
