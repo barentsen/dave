@@ -89,18 +89,15 @@ def computeBlsChiSqUnitless(time, flux, period, epoch, duration, depth):
 
     t1 = .25*period - .5*duration
     t2 = .25*period + .5*duration
-    plt.plot([t1,t2], [-depth, -depth], 'r-')
+    plt.plot([t1,t2], [-depth, -depth], 'c-', lw=4)
 
-    t0 = .25*period - 2.5*duration
-    print(t0)
-#    plt.errorbar(phase, flux, scatter_frac, color='r', lw=4, fmt='.')
+    t0 = .25 * period - 1.5 * duration
     plt.errorbar(t0, 0, scatter_frac, color='r',
                  lw=2,
                  fmt='o',
                  capsize=6,
                  capthick=2,
                  zorder=+100)
-#    plt.axhline(
     return chisquared / float(np.sum(idx)) - 1
 
 
