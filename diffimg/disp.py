@@ -1,0 +1,108 @@
+# -*- coding: utf-8 -*-
+
+"""
+Created on Mon Dec  3 21:14:40 2018
+
+Functions to plot target pixel files and difference images with sane defaults
+@author: fergal
+"""
+
+from __future__ import print_function
+from __future__ import division
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+def plotImage(img, **kwargs):
+    """Plot an image in linear scale
+    
+    Inputs
+    --------
+    img
+        (2d np array) Image to plot
+    
+    Optional Inputs
+    -----------------
+    log
+        (bool) Plot the image in log scalings. (Default False)
+    origin
+        (str) If 'bottom', put origin of image in bottom left hand corner (default).
+        If 'top', but it in top left corner
+    
+    interpolation
+        (str) Interpolation method. Default is nearest. See `plt.imshow` for more options
+        
+    cmap
+        (plt.cm.cmap) Color map. Default is YlGnBu_r
+    
+    extent
+        (4-tuple) Extent of image. See `plt.imshow` for more details
+        
+    All other optional arguments passed to `plt.imshow`
+    
+    
+    Returns
+    ----------
+    **None**
+    
+    Output
+    -------
+    A plot is returned
+    """
+    if 'origin' not in kwargs:
+        kwargs['origin'] = 'bottom'
+    
+    if 'interpolation' not in kwargs:
+        kwargs['interpolation'] = 'nearest'
+        
+    if 'cmap' not in kwargs:
+        kwargs['cmap'] = plt.cm.YlGnBu_r
+
+    if 'extent' not in kwargs:
+        shape = img.shape
+        extent = [0, shape[1], 0, shape[0]]
+        kwargs['extent'] = extent
+
+    log = kwargs.pop('log', False)
+
+    if log:
+        img = img.copy()
+        mn = np.min(img)
+        if mn < 0:
+            offset = -1.1*mn
+            img += offset
+        img = np.log10(img)
+        
+    plt.imshow(img, **kwargs)
+    plt.colorbar()
+    
+    
+    
+
+def plotDifferenceImage(img, **kwargs):
+    """Plot a difference image. 
+    
+    The colour bar is chosen so zero flux is at the centre of the colour map"""
+    if 'origin' not in kwargs:
+        kwargs['origin'] = 'bottom'
+    
+    if 'interpolation' not in kwargs:
+        kwargs['interpolation'] = 'nearest'
+        
+    if 'cmap' not in kwargs:
+        kwargs['cmap'] = plt.cm.RdBu_r
+
+    if 'extent' not in kwargs:
+        shape = img.shape
+        extent = [0, shape[1], 0, shape[0]]
+        kwargs['extent'] = extent
+        
+    plt.imshow(img, **kwargs)
+    plt.colorbar()
+    vm = max( np.fabs([np.min(img), np.max(img)]) )
+    plt.clim(-vm, vm)
+
+
+def plotDiffImage(img, **kwargs):
+    """Mneumonic"""
+    return plotDifferenceImage(img, **kwargs)
