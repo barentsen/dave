@@ -5,7 +5,6 @@ Created on Fri Dec  7 14:36:02 2018
 
 @author: smullally
 
-kwargs include ext=1 and header=True
 """
 
 from astroquery.mast import Observations
