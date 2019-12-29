@@ -15,8 +15,8 @@ import numpy as np
 import dave.diffimg.fastpsffit as ddf
 import dave.diffimg.disp as disp
 
+import dave.misc.transitfunc as transitfunc
 from dave.misc.plateau import plateau
-import dave.fileio.kplrfits as kplrfits
 
 def measurePerTransitCentroids(time, cube, period_days, epoch_days, duration_days, plotFilePattern=None):
     """Measure difference image centroids for each transit in a data set
@@ -98,7 +98,7 @@ def getIngressEgressCadences(time, period_days, epoch_btjd, duration_days):
     """
     assert np.all(np.isfinite(time))
 
-    idx = kplrfits.markTransitCadences(time, period_days, epoch_btjd, duration_days)
+    idx = transitfunc.markTransitCadences(time, period_days, epoch_btjd, duration_days)
     transits = np.array(plateau(idx, .5))
 
     return transits
