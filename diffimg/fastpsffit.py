@@ -71,7 +71,6 @@ def fastGaussianPrfFit(img, guess):
     assert len(guess) == 5
     
     mask = None
-#    soln = spOpt.minimize(costFunc, guess,args=(img,mask), method='Nelder-Mead', bounds=None)
     bounds = [
             (None, None),
             (None, None),
