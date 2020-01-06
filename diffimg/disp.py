@@ -10,6 +10,7 @@ Functions to plot target pixel files and difference images with sane defaults
 from __future__ import print_function
 from __future__ import division
 
+import matplotlib.colors as mcolor
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -58,11 +59,15 @@ def plotImage(img, **kwargs):
     if 'cmap' not in kwargs:
         kwargs['cmap'] = plt.cm.YlGnBu_r
 
+    if 'norm' not in kwargs:
+        kwargs['norm'] = mcolor.Normalize()
+        
     if 'extent' not in kwargs:
         shape = img.shape
         extent = [0, shape[1], 0, shape[0]]
         kwargs['extent'] = extent
 
+    showValues = kwargs.pop('showValues', False)
     log = kwargs.pop('log', False)
 
     if log:
@@ -72,12 +77,28 @@ def plotImage(img, **kwargs):
             offset = -1.1*mn
             img += offset
         img = np.log10(img)
-        
+         
     plt.imshow(img, **kwargs)
+    
+    if showValues:
+        showPixelValues(img, kwargs['cmap'], kwargs['norm'])
     plt.colorbar()
     
     
-    
+def showPixelValues(img, cmap, norm):
+
+    fmt= "%i"
+    nr, nc = img.shape 
+    for i in range(nc):
+        for j in range(nr):
+            clr = cmap(norm(img[j,i]))
+            
+            textcolor='w'
+            if np.prod(clr) > .2:
+                textcolor='k'
+
+            txt = fmt %(img[j,i])
+            plt.text(i+.5, j+.5, txt, color=textcolor, ha='center')
 
 def plotDifferenceImage(img, **kwargs):
     """Plot a difference image. 
@@ -106,3 +127,24 @@ def plotDifferenceImage(img, **kwargs):
 def plotDiffImage(img, **kwargs):
     """Mneumonic"""
     return plotDifferenceImage(img, **kwargs)
+
+
+
+def plotCentroidLocation(soln, *args, **kwargs):
+    """Add a point to the a plot.
+    
+    Private function of `generateDiffImgPlot()`
+    """
+    col, row = soln.x[:2]
+    ms = kwargs.pop('ms', 8)
+
+    kwargs['color'] = 'k'
+    kwargs['marker'] = 'o'
+    plt.plot([col], [row], *args, ms=ms+1, **kwargs)
+
+    color='orange'
+    if soln.success:
+        color='w'
+    kwargs['color'] = color
+    plt.plot([col], [row], *args, **kwargs)
+

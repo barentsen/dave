@@ -14,12 +14,9 @@ from __future__ import division
 
 from pdb import set_trace as debug
 import matplotlib.pyplot as plt
-import matplotlib as mpl
-import pandas as pd
 import numpy as np
 
 import dave.diffimg.fastpsffit as ddf
-import dave.diffimg.disp as disp
 
 from kepler.plateau import plateau
 import kepler.kplrfits as kplrfits
@@ -54,66 +51,66 @@ def computeCentroidTs(i0=0):
     time = fits['TIME']
     cin = fits['CADENCENO']
     cube = ktpf.getTargetPixelArrayFromFits(fits, hdr)
-    
+
     idx = np.isfinite(time) & (time>0)
     time = time[idx]
     cube = cube[idx]
     cin = cin[idx]
-    
-    
+
+
     num = 2000 - i0
     out = np.zeros( (num, 6) )
     for i in range(i0, num):
         print(i)
         img = cube[i]
-        
+
         guess = pickInitialGuess(img)
         nr, nc = img.shape
         modelIn = ddf.computeModel(nc, nr, guess)
         soln = ddf.fastGaussianPrfFit(img, guess)
-        
+
         if soln.x[2] < .1:
             soln = ddf.fastGaussianPrfFit(img, guess + np.random.rand(5)*.1)
-            
+
         modelOut = ddf.computeModel(nc, nr, soln.x)
-#            
+#
 #        log = True
 #        clim = [1, np.max(img)]
-#        
+#
 #        if log:
 #            clim = np.log10( np.array(clim) )
-#        
+#
 #        plt.clf()
 #        plt.suptitle("%i CIN = %i BTJD = %.3f" %(i, cin[i], time[i]))
 #        plt.subplot(221)
 #        disp.plotImage(img, clim=clim, log=log)
-#        
+#
 #        plt.subplot(222)
 #        disp.plotImage(modelIn, clim=clim, log=log)
-#        
+#
 #        plt.subplot(223)
 #        disp.plotImage(modelOut, clim=clim, log=log)
 #
 #        plt.subplot(224)
 #        disp.plotDiffImage(img - modelOut)
-#        
+#
 #        print(soln.x, soln.success, soln.fun)
 #        plt.pause(1)
-#        
+#
         out[i-i0, :-1]  = soln.x
         out[i-i0, -1] = soln.fun
 #        return soln
-        
+
     return out
 
 def pickInitialGuess(img):
     """Pick initial guess of params for `fastGaussianPrfFit`
-    
+
     Inputs
     ---------
     img
         (2d np array) Image to be fit
-        
+
     Returns
     ---------
     An array of initial conditions for the fit
@@ -127,7 +124,7 @@ def pickInitialGuess(img):
 
 
 #########################################################################
-    
+
 def tic_307210830_02_01():
     """First TCE on TIC 307210830 in second sector """
     tic = 307210830

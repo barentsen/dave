@@ -8,7 +8,7 @@ Nomenclature
 A point spread function is the analytic model of the distribution of light on the focal planet
 from a point source.
 
-A Pixel Response Function 9PRF) is the distribution of light on the pixels of the detector, with one
+A Pixel Response Function (PRF) is the distribution of light on the pixels of the detector, with one
 value for each pixel. In general, a PRF it may include the jitter, or the intrapixel response,
 but those aren't included in this model yet.
 
@@ -21,6 +21,8 @@ Example PSF functions are `gaussianPsf()` and `gaussianWithConstantSkyPsf()`
 
 Notes
 ----------
+* Use the fastpsffit module in preference to this one. It's significantly faster
+
 * The signature of a model is function(col, row, *args)
 
 * The fitting function is extremely slow. To speed it up, we use numba to on-the-fly compile

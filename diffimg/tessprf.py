@@ -51,7 +51,7 @@ class TessPrf(AbstractPrfLookup):
         self.ddir = path
 
 
-    def getPrfForBbox(self, col, row, ccd, camera, sector, bboxIn):
+    def getPrfForBbox(self, sector, camera, ccd, col, row, bboxIn):
         """Get PRF for a bounding box.
 
         See `getPrfAtColRow()` and documentation in the same method in the parent class
@@ -90,7 +90,7 @@ class TessPrf(AbstractPrfLookup):
         #date we'll need some logic here.
         #sector = self.sectorLookup(sector)
         sector = self.pathLookup(ccd,camera,sector)
-        
+
         key = "MAT%1i-%1i-%02i" %(ccd, camera, sector)
 
         if key not in self.cache:
@@ -244,7 +244,7 @@ class TessPrf(AbstractPrfLookup):
 
         colOffset = gridSize - np.round(gridSize * colFrac) - 1
         rowOffset = gridSize - np.round(gridSize * rowFrac) - 1
-        
+
         #print(colOffset)
         #print(rowOffset)
 
@@ -283,7 +283,7 @@ class TessPrf(AbstractPrfLookup):
         #fullImage = singlePrfObj.values/ float(singlePrfObj.samplesPerPixel)
         fullImage = singlePrfObj.values
         #print(fullImage[0,0])
-        
+
         #Number of pixels in regularly sampled PRF. Typically 13x13
         nColOut, nRowOut = fullImage.shape
         nColOut /= float(gridSize)
@@ -306,18 +306,11 @@ class TessPrf(AbstractPrfLookup):
         """
         #OK, this is paranoia. These statements have already been asserted, but in a
         #different function
- 
+
         assert evalCols[0] == evalCols[2]
         assert evalCols[1] == evalCols[3]
         assert evalRows[0] == evalRows[1]
         assert evalRows[2] == evalRows[3]
-
-#        print(evalCols)
-#        print(evalRows)
-#        print(regPrfArray[0][1,1])
-#        print(regPrfArray[1][1,1])
-#        print(regPrfArray[2][1,1])
-#        print(regPrfArray[3][1,1])
 
         p11, p21, p12, p22 = regPrfArray
         c0, c1 = evalCols[:2]
@@ -339,63 +332,57 @@ class TessPrf(AbstractPrfLookup):
 
 
     def readPrfFile(self, ccd, camera, sector):
-
-        #if camera != 1:
-        #    raise ValueError("Only camera 1 currently available")
-        
-
         fn = "tess%13s-00072_035-%i-%i-characterized-prf.mat" % \
                                         (self.datestring, camera, ccd)
         path = os.path.join(self.path, fn)
-        #print(path)
 
         obj = spio.matlab.loadmat(path, struct_as_record=False, squeeze_me=True)
         prfObj = obj['prfStruct']
         return prfObj
 
     def readOnePrfFitsFile(self, ccd, camera, col, row, sector):
-        
+
         fn = "cam%u_ccd%u/tess%13s-prf-%1u-%1u-row%04u-col%04u.fits" % \
             (camera, ccd, self.datestring, camera, ccd, row, col)
-        
+
         filepath = os.path.join(self.path, fn)
         #print(filepath)
-        
+
         #Cache the read infiles in case you use more than once.
         key = "FITS%1i-%1i-%02i-%04i-%04i" %(ccd, camera, sector,row,col)
 
         if key not in self.cache:
             hdulistObj = fits.open(filepath)
             prfArray = hdulistObj[0].data
-            
+
             self.cache[key] = prfArray
 
         prfArray = self.cache[key]
-        
+
         return prfArray
 
     def determineClosestTessRowCol(self,col,row):
         """Determine the two rows and two columns to the row, col position
-        of your target. These are specific to TESS and where they chose to report 
+        of your target. These are specific to TESS and where they chose to report
         their PRFs.
         Returns Row list and Col list.
         """
-        
+
         posRows = np.array([1, 513, 1025, 1536, 2048])
         posCols = np.array([45, 557, 1069, 1580,2092])
-        
+
         difcol = np.abs(posCols - col)
         difrow = np.abs(posRows - row)
-        
+
         #Expand out to the four image position to interpolate between,
         #Return as a list of tuples.
         imagePos = []
         for r in posRows[np.argsort(difrow)[0:2]]:
             for c in posCols[np.argsort(difcol)[0:2]]:
                 imagePos.append((c,r))
-            
+
         return imagePos
-    
+
     def getRegSampledPrfFitsByOffset(self, prfArray, colOffset, rowOffset):
         """Private function of `getSingleRegularlySampledPrf()`
 
@@ -436,75 +423,75 @@ class TessPrf(AbstractPrfLookup):
 
         #Don't understand why this must be a twoliner
         tmp = prfArray[iRow, :]
-        
+
         return tmp[:,iCol]
-    
+
     def getRegularlySampledBracketingPrfFits(self, ccd,camera,col,row,sector):
         """
         Get the regularly sampled PRF image.
-        
+
         Returns
         ------------
         regPrfArr
             An array of 4 regularly sampled PRFs (regularly sampled PRFs are 13x13 images that can be
             directly compared to a real image (unlike the PRF objects stored on disk, which need to be
             unpacked before use)
-        
+
         evalCols
             array of columns of the 4 images.
         evalRows
             array of rows of the 4 images.
-            
+
         """
-             
+
         colOffset,rowOffset = self.getOffsetsFromPixelFractions(col, row)
-        
+
         imagePos = self.determineClosestTessRowCol(col,row)
         prfImages = []
         evalCols = []
         evalRows = []
-        
+
         for pos in imagePos:
             prfArray = self.readOnePrfFitsFile(ccd, camera, pos[0], pos[1], \
                            sector)
-            
+
             img = self.getRegSampledPrfFitsByOffset(prfArray, colOffset, rowOffset)
-            
+
             prfImages.append(img)
-            
+
             evalCols.append(pos[0])
             evalRows.append(pos[1])
-        
+
         return prfImages, np.array(evalCols),np.array(evalRows)
-        
-        
+
+
     def pathLookup(self,ccd,camera,sector):
         """
         Get the file name version information
         based on the ccd, camer and sector of your data.
         """
-        
+
         if sector < 1:
            raise ValueError("Sector must be greater than 0.")
         if (camera > 4) | (ccd > 4):
             raise ValueError("Camera or CCD is larger than 4.")
-        
+
         if sector <= 3:
             self.path = self.ddir + "/start_s0001/"
             sector=1
         else:
             self.path = self.ddir + "/start_s0004/"
             sector=4
-        
+
         self.datestring = "2018243163600"
-        
+
         if camera >= 3:
             self.datestring = "2018243163601"
         elif (camera == 2) & (ccd == 4):
             self.datestring = "2018243163601"
-        
+
         return sector
-    
+
     def getPrfAtColRowFits(self, col, row, ccd, camera, sector):
         """
         Lookup a 13x13 PRF image for a single location
@@ -527,7 +514,7 @@ class TessPrf(AbstractPrfLookup):
         row = float(row)
 
         self.checkOutOfBounds(col, row)
-        #Currently, the same PRF model applies to all sectors, 
+        #Currently, the same PRF model applies to all sectors,
         #But we will need this in the future.
         #Returned sector is the start sector of the prfs.
         sector = self.pathLookup(ccd,camera,sector)
@@ -539,7 +526,7 @@ class TessPrf(AbstractPrfLookup):
 #        regPrf = self.getSingleRegularlySampledPrf(bestPrf, col, row)
         return bestPrf
 
-        
+
 
 
 def getBracketingIndices(evalColRow, cr):

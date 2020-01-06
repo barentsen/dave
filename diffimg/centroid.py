@@ -17,9 +17,6 @@ import matplotlib as mp
 import numpy as np
 
 
-import matplotlib.pyplot as mp
-import numpy as np
-
 import dave.fileio.mastio as mastio
 import dave.fileio.tpf as tpf
 import dave.fileio.kplrfits as kplrfits
@@ -27,7 +24,7 @@ import dave.fileio.kplrfits as kplrfits
 import dave.diffimg.prf as prf
 import dave.diffimg.diffimg as diffimg
 import dave.diffimg.arclen as arclen
-import dave.misc.plotTpf
+import dave.misc.plotTpf as plotTpf
 
 import dave.misc.covar as covar
 import scipy.optimize as sopt
@@ -224,7 +221,7 @@ def measureDiffOffset(period_days, epoch_bkjd, duration_hrs, \
                 prfObj, ccdMod, ccdOut, cube, w, bbox, rollPhase, qFlags, \
                 hdr=None, plot=False)
             diagnostics[i] = dDict
-        except ValueError, e:
+        except ValueError as e:
             log.append("Img %i: %s" %(w, e))
             pass
 
@@ -348,7 +345,6 @@ def fitPrfCentroidForImage(img, ccdMod, ccdOut, bbox, prfObj):
     A scipy.optimise.OptimizeResult object. The best fit
     params are stored in OptimizeResult.x
 
-
     Notes:
     ----------
     The return object will frequently set success=False. I've seen no
@@ -412,6 +408,9 @@ def getBoundingBoxForImage(img, hdr):
     ----------
     A 4 element list for column0, column1, row0, row1
 
+    TODO
+    -----
+    Should I be able to pass in an initial guess?
     """
     shape= img.shape
     c0 = float(hdr['1CRV4P'])
@@ -475,7 +474,7 @@ def plotCentroidFitDiagnostic(img, hdr, ccdMod, ccdOut, res, prfObj):
     mp.colorbar()
     mp.title("Residuals")
 
-    print "Performance %.3f" %(np.max(np.abs(diff))/np.max(img))
+    print ("Performance %.3f" %(np.max(np.abs(diff))/np.max(img)))
 
 
 

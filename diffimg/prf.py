@@ -7,7 +7,7 @@ __version__ = "$Id: prf.py 1964 2015-02-27 18:33:11Z fmullall $"
 __URL__ = "$URL: svn+ssh://flux/home/fmullall/svn/kepler/py/prf.py $"
 
 
-from AbstractPrfLookup import AbstractPrfLookup
+from dave.diffimg.AbstractPrfLookup import AbstractPrfLookup
 
 
 class KeplerPrf(AbstractPrfLookup):
