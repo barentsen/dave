@@ -161,10 +161,7 @@ def plotTpfLc(cube, hdr, *args, **kwargs):
 
     detrendFlag = kwargs.pop('detrend', False)
     bigFlag = kwargs.pop('big', False)
-
     nCin, nR, nC = cube.shape
-
-    print nCin, nR, nC
     nPix = nR*nC
 
     #Prevent automatic plotting of really big masks.
