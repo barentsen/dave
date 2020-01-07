@@ -11,6 +11,34 @@ and the abstract class implements getPrfForBoundingBox.
 The abstract lookup class will implement any shared bookkeeping code
 for interpolation for PRFs.
 
+
+File layout
+
+abstractprf.py
+    AbstractPrf
+    AbstractLookupPrf
+
+kepler.py
+    KeplerPrf
+    K2Prf  #Mneumonic?
+
+tess.py
+    TessPrf
+
+analyticprf.py
+    GaussianPrf
+    GaussianPlusSkyPrf
+    GeneralPrf  #For fitting arbitrary model
+
+centroid.py
+    fitPrfToImage
+    fitPrfToCube
+    measureDiffImageOffset
+
+k2centroid
+    #Diff images for K2 are special because of the roll
+    measureK2DiffImageOffset
+
 @author: fergal
 """
 
@@ -21,20 +49,32 @@ import numpy as np
 from scipy.special import erf
 
 
+#abstractprf.py
 class AbstractPrf():
-    def __init__(*instrumentArgs):
+    def __init__(**kwargs):
+        pass
+
+    def getPrfForBbox(self, bbox, col0, row0, **kwargs):
         pass
 
 
-    def getPrfForBbox(self, bbox, col0, row0):
-        """InstrumentARgs might be mod out, or sector, camera, ccd, etc"""
-        pass
+class AbstractLookupPrf():
+    """Abstract class for PRFs that are computed by lookup of the data in a file"""
 
-    def getPrfAtColRow(self, col, row):
-        pass
+    def _interpolatePrf(self, bbox, col, row, getPrfFunc):
+        """Given 4 PRF objects at 4 locations on CCD, figure out
+        what the PRF at our location should look like
+
+        This method will be called by any daughter class from withing
+        `getPrfForBbox`
+        """
+        raise NotImplementedError
 
 
+
+#analyticprf.py
 class GaussianPrf():
+    """See also GaussianPlusSkyPrf()"""
     def __init__(self, **kwargs):
         assert len(kwargs) == 0
         pass
@@ -48,17 +88,23 @@ class GaussianPrf():
         xr = np.arange(nr) + r0
         cols, rows = np.meshgrid(xc, xr)
 
-        model = analytic_gaussian_integral(cols, rows, col0, row0, sigma, flux)
+        model = _analytic_gaussian_integral(cols, rows, col0, row0, sigma, flux)
         return model
 
 
 class GaussianPlusSkyPrf(GaussianPrf):
+    """An analytic PRF modeling the star as a 2d symettric Gaussian
+    sitting on top of a constant background"""
+
     def getPrfForBbox(self, bbox, col0, row0, sigma=1, flux=1, sky=0):
         model = GaussianPrf.getPrfForBbox(bbox, col0, row0, sigma, flux)
         return model + sky
 
 
-def analytic_gaussian_integral(self, col, row, col0, row0, sigma0, flux0):
+def _analytic_gaussian_integral(self, col, row, col0, row0, sigma0, flux0):
+    """Compute the flux per pixel for a symetric Gaussian centred at
+    col0, row0
+    """
     z_col1 = .5 * (col - col0) / sigma0
     z_col2 = .5 * (col+1 - col0) / sigma0
 
@@ -83,14 +129,7 @@ def phi(z):
 
 
 
-class AbstractLookupPrf():
-    """Abstract class for PRFs that are computed by lookup of the data in a file"""
-
-    def abstractGetPrfForBbox(self, bbox, col, row, getPrfFunc):
-        pass
-
-
-
+#keplerprf.py
 class KeplerPrf(AbstractLookupPrf):
     def __init__(self, path, **kwargs):
         AbstractLookupPrf.__init__(self, path)
@@ -102,6 +141,13 @@ class KeplerPrf(AbstractLookupPrf):
         pass
 
 
+class K2Prf(KeplerPrf):
+    """Currently identical to the KeplerPrf, but I include this class
+    in case that changes in the future"""
+    pass
+
+
+#tessprf.py
 class TessPrf(AbstractLookupPrf):
     def __init__(self, path, **kwargs):
         AbstractLookupPrf.__init__(self, path)
@@ -114,33 +160,45 @@ class TessPrf(AbstractLookupPrf):
         pass
 
 
-def fitPrfToCube(prfObj, cube, bbox, col0, row0, params):
+#centroid.py
+
+def fitPrfToCube(prfObj, cube, bbox, *args):
     """Find the best fit prf for each image in cube.
 
     See fitPrfToImage for more details
 
+    args is [col, row, [param1, [param2, ...]]]
+
+
     Notes
     ------
+    getPrfForBBox(bbox, col0, row0, *args)
     costFun could argubly be an input parameter
     """
 
+    assert len(args) >= 2
+
+    initGuess = args
     options = {'disp':False, 'eps':.02, 'maxiter':80}
-    args = (col0, row0, bbox, params)
     #Don't let the fit leave the bounding box
     bounds=[(bbox[0], bbox[1]), \
             (bbox[2], bbox[3]), \
             (1, None), \
            ]
 
+    #Define bounds for other params
+
     solnArray = []
     for i in range(len(cube)):
         img = cube[i]
+        argsForCostFunc = (prfObj, img, bbox)
 
         #@TODO update initial guess if previous fit succeeded
-        args = (prfObj, img, bbox, params)
 
+
+        import scipy.optimize as spopt
         #This doesn't work, can't pass dict to minimize
-        soln = sopt.minimize(costFunc, initGuess, args, \
+        soln = spopt.minimize(costFunc, initGuess, argsForCostFunc, \
             method="L-BFGS-B", bounds=bounds, options=options)
 
         solnArray.append(soln)
@@ -148,13 +206,17 @@ def fitPrfToCube(prfObj, cube, bbox, col0, row0, params):
     return solnArray
 
 
-def costFunc(x, prfObj, img, bbox, params):
+def costFunc(args, prfObj, img, bbox):
     """Measure goodness of fit (chi-square) for a PRF
-    with a given col, row and scale (i.e brightness)"""
+    with a given col, row and scale (i.e brightness)
+
+
+    args is [col, row, [param1, [param2, ...]]]
+    """
 
     col = x[0] - bbox[0]
     row = x[1] - bbox[2]  #Note, two, not one
-    model = prfObj.getPrfForBbox(img, bbox, col, row, params)
+    model = prfObj.getPrfForBbox(bbox, *args)
 
     cost = img-model
     cost = np.sum(cost**2)
